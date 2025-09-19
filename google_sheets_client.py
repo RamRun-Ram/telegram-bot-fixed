@@ -2,12 +2,10 @@
 Клиент для работы с Google Sheets API
 """
 import os
-import json
 import logging
-from datetime import datetime
 from typing import List, Dict, Any, Optional
-from google.oauth2 import service_account
 from googleapiclient.discovery import build
+from google.oauth2 import service_account
 from googleapiclient.errors import HttpError
 from config import GOOGLE_SHEET_ID, GOOGLE_SHEET_NAME, STATUS_PUBLISHED, STATUS_PENDING
 
@@ -20,6 +18,9 @@ class GoogleSheetsClient:
         self.service = None
         self.SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
         self._authenticate()
+        
+        # Кэш для имени листа
+        self._sheet_name = None
     
     def _authenticate(self):
         """Аутентификация в Google Sheets API через Service Account"""
@@ -51,6 +52,37 @@ class GoogleSheetsClient:
             logger.error(f"Ошибка Service Account аутентификации: {e}")
             logger.warning("Google Sheets API не инициализирован - система будет работать без него")
             self.service = None
+        
+        # Кэш для имени листа
+        self._sheet_name = None
+    
+    def get_sheet_name(self) -> str:
+        """Получает имя первого доступного листа"""
+        if not self.service:
+            return GOOGLE_SHEET_NAME
+        
+        if self._sheet_name:
+            return self._sheet_name
+        
+        try:
+            # Получаем информацию о таблице
+            result = self.service.spreadsheets().get(spreadsheetId=GOOGLE_SHEET_ID).execute()
+            sheets = result.get('sheets', [])
+            
+            if sheets:
+                # Берем первый лист
+                first_sheet = sheets[0].get('properties', {}).get('title', GOOGLE_SHEET_NAME)
+                self._sheet_name = first_sheet
+                logger.info(f"📋 Используем лист: '{first_sheet}'")
+                return first_sheet
+            else:
+                logger.warning("⚠️ В таблице нет листов, используем значение по умолчанию")
+                return GOOGLE_SHEET_NAME
+                
+        except Exception as e:
+            logger.error(f"❌ Ошибка получения имени листа: {e}")
+            logger.info(f"📋 Используем значение по умолчанию: '{GOOGLE_SHEET_NAME}'")
+            return GOOGLE_SHEET_NAME
     
     def add_post(self, post_data: Dict[str, Any]) -> bool:
         """Добавляет пост в Google Sheets"""
@@ -70,11 +102,14 @@ class GoogleSheetsClient:
                 ]
             ]
             
+            # Получаем имя листа
+            sheet_name = self.get_sheet_name()
+            
             # Добавляем строку в конец таблицы
             body = {'values': values}
             result = self.service.spreadsheets().values().append(
                 spreadsheetId=GOOGLE_SHEET_ID,
-                range=f'{GOOGLE_SHEET_NAME}!A:E',
+                range=f'{sheet_name}!A:E',
                 valueInputOption='RAW',
                 insertDataOption='INSERT_ROWS',
                 body=body
@@ -97,10 +132,13 @@ class GoogleSheetsClient:
             return []
             
         try:
+            # Получаем имя листа
+            sheet_name = self.get_sheet_name()
+            
             # Получаем данные из таблицы
             result = self.service.spreadsheets().values().get(
                 spreadsheetId=GOOGLE_SHEET_ID,
-                range=f'{GOOGLE_SHEET_NAME}!A:E'
+                range=f'{sheet_name}!A:E'
             ).execute()
             
             values = result.get('values', [])
@@ -108,17 +146,18 @@ class GoogleSheetsClient:
                 logger.info("Таблица пуста")
                 return []
             
-            # Пропускаем заголовок и берем последние записи
+            # Пропускаем заголовок, берем последние записи
             posts = []
-            for row in values[1:][-limit:]:
-                if len(row) >= 5:
-                    posts.append({
+            for row in values[1:][-limit:]:  # Пропускаем заголовок, берем последние limit записей
+                if len(row) >= 5:  # Проверяем, что строка содержит все необходимые колонки
+                    post = {
                         'date': row[0] if len(row) > 0 else '',
                         'time': row[1] if len(row) > 1 else '',
                         'text': row[2] if len(row) > 2 else '',
                         'image_urls': row[3] if len(row) > 3 else '',
                         'status': row[4] if len(row) > 4 else ''
-                    })
+                    }
+                    posts.append(post)
             
             logger.info(f"Получено {len(posts)} постов из Google Sheets")
             return posts
@@ -137,10 +176,13 @@ class GoogleSheetsClient:
             return []
             
         try:
+            # Получаем имя листа
+            sheet_name = self.get_sheet_name()
+            
             # Получаем данные из таблицы
             result = self.service.spreadsheets().values().get(
                 spreadsheetId=GOOGLE_SHEET_ID,
-                range=f'{GOOGLE_SHEET_NAME}!A:E'
+                range=f'{sheet_name}!A:E'
             ).execute()
             
             values = result.get('values', [])
@@ -148,32 +190,26 @@ class GoogleSheetsClient:
                 logger.info("Таблица пуста")
                 return []
             
-            # Пропускаем заголовок и ищем посты со статусом "Ожидает"
+            # Фильтруем посты со статусом "Ожидает"
             pending_posts = []
-            for i, row in enumerate(values[1:], start=2):  # start=2 потому что пропускаем заголовок
-                if len(row) >= 5:
-                    status = row[4] if len(row) > 4 else ''
-                    if status == STATUS_PENDING:
-                        # Парсим image_urls если они есть
-                        image_urls = []
-                        if len(row) > 3 and row[3]:
-                            try:
-                                # Предполагаем, что URLs разделены запятыми
-                                image_urls = [url.strip() for url in row[3].split(',') if url.strip()]
-                            except Exception as e:
-                                logger.warning(f"Ошибка парсинга image_urls: {e}")
-                                image_urls = []
-                        
-                        pending_posts.append({
-                            'row_index': i - 1,  # Индекс строки в таблице (0-based)
-                            'date': row[0] if len(row) > 0 else '',
-                            'time': row[1] if len(row) > 1 else '',
-                            'text': row[2] if len(row) > 2 else '',
-                            'image_urls': image_urls,
-                            'status': status
-                        })
+            for i, row in enumerate(values[1:], start=2):  # Пропускаем заголовок, начинаем с строки 2
+                if len(row) >= 5 and row[4] == STATUS_PENDING:  # Проверяем статус в колонке E
+                    # Парсим URL изображений
+                    image_urls = []
+                    if len(row) > 3 and row[3]:  # Если есть URL изображений
+                        image_urls = [url.strip() for url in row[3].split(',') if url.strip()]
+                    
+                    post = {
+                        'date': row[0] if len(row) > 0 else '',
+                        'time': row[1] if len(row) > 1 else '',
+                        'text': row[2] if len(row) > 2 else '',
+                        'image_urls': image_urls,
+                        'status': row[4] if len(row) > 4 else '',
+                        'row_index': i  # Добавляем индекс строки для обновления статуса
+                    }
+                    pending_posts.append(post)
             
-            logger.info(f"Найдено {len(pending_posts)} постов со статусом 'Ожидает'")
+            logger.info(f"Найдено {len(pending_posts)} постов для публикации")
             return pending_posts
             
         except HttpError as e:
@@ -190,10 +226,13 @@ class GoogleSheetsClient:
             return []
             
         try:
+            # Получаем имя листа
+            sheet_name = self.get_sheet_name()
+            
             # Получаем данные из таблицы
             result = self.service.spreadsheets().values().get(
                 spreadsheetId=GOOGLE_SHEET_ID,
-                range=f'{GOOGLE_SHEET_NAME}!A:E'
+                range=f'{sheet_name}!A:E'
             ).execute()
             
             values = result.get('values', [])
@@ -201,31 +240,27 @@ class GoogleSheetsClient:
                 logger.info("Таблица пуста")
                 return []
             
-            # Пропускаем заголовок и возвращаем все посты
-            all_posts = []
-            for i, row in enumerate(values[1:], start=2):  # start=2 потому что пропускаем заголовок
-                if len(row) >= 5:
-                    # Парсим image_urls если они есть
+            # Обрабатываем все посты
+            posts = []
+            for i, row in enumerate(values[1:], start=2):  # Пропускаем заголовок
+                if len(row) >= 5:  # Проверяем, что строка содержит все необходимые колонки
+                    # Парсим URL изображений
                     image_urls = []
-                    if len(row) > 3 and row[3]:
-                        try:
-                            # Предполагаем, что URLs разделены запятыми
-                            image_urls = [url.strip() for url in row[3].split(',') if url.strip()]
-                        except Exception as e:
-                            logger.warning(f"Ошибка парсинга image_urls: {e}")
-                            image_urls = []
+                    if len(row) > 3 and row[3]:  # Если есть URL изображений
+                        image_urls = [url.strip() for url in row[3].split(',') if url.strip()]
                     
-                    all_posts.append({
-                        'row_index': i - 1,  # Индекс строки в таблице (0-based)
+                    post = {
                         'date': row[0] if len(row) > 0 else '',
                         'time': row[1] if len(row) > 1 else '',
                         'text': row[2] if len(row) > 2 else '',
                         'image_urls': image_urls,
-                        'status': row[4] if len(row) > 4 else ''
-                    })
+                        'status': row[4] if len(row) > 4 else '',
+                        'row_index': i  # Добавляем индекс строки для обновления статуса
+                    }
+                    posts.append(post)
             
-            logger.info(f"Получено {len(all_posts)} постов из Google Sheets")
-            return all_posts
+            logger.info(f"Получено {len(posts)} постов из Google Sheets")
+            return posts
             
         except HttpError as e:
             logger.error(f"Ошибка Google Sheets API: {e}")
@@ -241,41 +276,44 @@ class GoogleSheetsClient:
             return True
             
         try:
-            # Обновляем статус в колонке E (индекс 4)
-            values = [[status]]
-            body = {'values': values}
+            # Получаем имя листа
+            sheet_name = self.get_sheet_name()
             
+            # Обновляем статус в колонке E
             result = self.service.spreadsheets().values().update(
                 spreadsheetId=GOOGLE_SHEET_ID,
-                range=f'{GOOGLE_SHEET_NAME}!E{row_index + 1}',
+                range=f'{sheet_name}!E{row_index}',
                 valueInputOption='RAW',
-                body=body
+                body={'values': [[status]]}
             ).execute()
             
-            logger.info(f"Статус поста обновлен: {result.get('updatedCells', 0)} ячеек")
+            logger.info(f"Статус поста в строке {row_index} обновлен на '{status}'")
             return True
             
         except HttpError as e:
             logger.error(f"Ошибка Google Sheets API: {e}")
             return False
         except Exception as e:
-            logger.error(f"Ошибка обновления статуса: {e}")
+            logger.error(f"Ошибка обновления статуса поста: {e}")
             return False
     
     def clear_sheet(self) -> bool:
-        """Очищает таблицу (оставляет только заголовки)"""
+        """Очищает таблицу (удаляет все данные кроме заголовков)"""
         if not self.service:
             logger.warning("Google Sheets API не инициализирован, пропускаем очистку")
             return True
             
         try:
-            # Очищаем все данные кроме заголовка
+            # Получаем имя листа
+            sheet_name = self.get_sheet_name()
+            
+            # Очищаем данные (оставляем заголовки)
             result = self.service.spreadsheets().values().clear(
                 spreadsheetId=GOOGLE_SHEET_ID,
-                range=f'{GOOGLE_SHEET_NAME}!A2:E'
+                range=f'{sheet_name}!A2:E'
             ).execute()
             
-            logger.info("Таблица очищена")
+            logger.info("Таблица очищена (заголовки сохранены)")
             return True
             
         except HttpError as e:
@@ -292,15 +330,16 @@ class GoogleSheetsClient:
             return True
             
         try:
-            # Добавляем заголовки
-            headers = [['Дата', 'Время', 'Текст', 'Изображения', 'Статус']]
-            body = {'values': headers}
+            # Получаем имя листа
+            sheet_name = self.get_sheet_name()
             
+            # Устанавливаем заголовки
+            headers = [['Date', 'Time', 'Text', 'Image URLs', 'Status']]
             result = self.service.spreadsheets().values().update(
                 spreadsheetId=GOOGLE_SHEET_ID,
-                range=f'{GOOGLE_SHEET_NAME}!A1:E1',
+                range=f'{sheet_name}!A1:E1',
                 valueInputOption='RAW',
-                body=body
+                body={'values': headers}
             ).execute()
             
             logger.info("Заголовки таблицы настроены")
