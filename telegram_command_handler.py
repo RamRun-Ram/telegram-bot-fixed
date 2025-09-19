@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import Optional
 import telebot
 from ai_post_generator import AIPostGenerator
+from ai_post_generator_stub import AIPostGeneratorStub
 from google_sheets_client_simple import GoogleSheetsClient
 from config import TELEGRAM_BOT_TOKEN, NOTIFICATION_CHANNEL_ID, COMMAND_CHANNEL_ID
 
@@ -32,7 +33,18 @@ class TelegramCommandHandler:
         """Ленивая инициализация AI генератора"""
         if self.ai_generator is None:
             logger.info("Инициализация AI генератора...")
-            self.ai_generator = AIPostGenerator()
+            try:
+                # Пробуем создать реальный AI генератор
+                self.ai_generator = AIPostGenerator()
+                # Тестируем API ключ
+                if hasattr(self.ai_generator, '_test_api_key_sync'):
+                    if not self.ai_generator._test_api_key_sync():
+                        logger.warning("⚠️ API ключ не работает, переключаемся на заглушку")
+                        self.ai_generator = AIPostGeneratorStub()
+            except Exception as e:
+                logger.error(f"❌ Ошибка инициализации AI генератора: {e}")
+                logger.info("🔄 Переключаемся на заглушку")
+                self.ai_generator = AIPostGeneratorStub()
         return self.ai_generator
     
     def setup_handlers(self):
