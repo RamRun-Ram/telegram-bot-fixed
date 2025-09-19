@@ -4,7 +4,7 @@
 import logging
 from typing import Dict, Any, Optional
 from telegram_client import TelegramClient
-from config import ADMIN_CHAT_ID, NOTIFICATION_CHANNEL_ID
+from config import ADMIN_CHAT_ID, NOTIFICATION_CHANNEL_ID, ALERT_ADMIN_CHANNEL
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +20,7 @@ class NotificationSystem:
         self.telegram_client = telegram_client
         self.admin_chat_id = ADMIN_CHAT_ID
         self.notification_channel_id = NOTIFICATION_CHANNEL_ID
+        self.alert_channel_id = ALERT_ADMIN_CHANNEL
     
     async def send_info_notification(self, title: str, details: Dict[str, str]):
         """Отправляет информационное уведомление"""
@@ -48,6 +49,55 @@ class NotificationSystem:
             await self._send_notification(error_message, NotificationType.ERROR)
         except Exception as e:
             logger.error(f"Ошибка отправки уведомления об ошибке: {e}")
+    
+    async def send_check_notification(self, total_pending: int, published_count: int, errors_count: int, current_time: str):
+        """Отправляет уведомление о результатах проверки в AlertChanel"""
+        try:
+            # Определяем статус проверки
+            if errors_count > 0:
+                status_emoji = "⚠️"
+                status_text = "с ошибками"
+            elif published_count > 0:
+                status_emoji = "✅"
+                status_text = "успешно"
+            else:
+                status_emoji = "ℹ️"
+                status_text = "без публикаций"
+            
+            message = f"{status_emoji} <b>ПРОВЕРКА ЗАВЕРШЕНА</b>\n\n"
+            message += f"🕐 <b>Время:</b> {current_time}\n"
+            message += f"📊 <b>Статус:</b> {status_text}\n\n"
+            message += f"📝 <b>Найдено постов:</b> {total_pending}\n"
+            message += f"✅ <b>Опубликовано:</b> {published_count}\n"
+            message += f"❌ <b>Ошибок:</b> {errors_count}\n"
+            
+            if published_count > 0:
+                message += f"\n🎉 <b>Успешно опубликовано {published_count} постов!</b>"
+            elif total_pending > 0:
+                message += f"\n⏰ <b>Найдено {total_pending} постов, но время публикации еще не наступило</b>"
+            else:
+                message += f"\n😴 <b>Нет постов для публикации</b>"
+            
+            # Отправляем в AlertChanel
+            await self._send_alert_notification(message)
+            
+        except Exception as e:
+            logger.error(f"Ошибка отправки уведомления о проверке: {e}")
+    
+    async def _send_alert_notification(self, message: str):
+        """Отправляет уведомление в AlertChanel"""
+        try:
+            if self.alert_channel_id:
+                await self.telegram_client.bot.send_message(
+                    chat_id=self.alert_channel_id,
+                    text=message,
+                    parse_mode='HTML'
+                )
+                logger.info("Уведомление о проверке отправлено в AlertChanel")
+            else:
+                logger.warning("AlertChanel не настроен")
+        except Exception as e:
+            logger.error(f"Ошибка отправки уведомления в AlertChanel: {e}")
     
     async def _send_notification(self, message: str, notification_type: str):
         """Отправляет уведомление в канал или чат"""

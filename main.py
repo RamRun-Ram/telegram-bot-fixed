@@ -120,6 +120,9 @@ class TelegramAutomation:
             
             if not pending_posts:
                 logger.info("Нет постов для публикации")
+                # Отправляем уведомление о пустой проверке
+                current_time = datetime.now(self.moscow_tz).strftime('%H:%M:%S')
+                await self.notification_system.send_check_notification(0, 0, 0, current_time)
                 return
             
             logger.info(f"Найдено {len(pending_posts)} постов со статусом 'Ожидает'")
@@ -136,13 +139,30 @@ class TelegramAutomation:
             
             if not posts_to_publish:
                 logger.info("Нет постов, готовых к публикации по времени")
+                # Отправляем уведомление о проверке без публикаций
+                current_time_str = current_time.strftime('%H:%M:%S')
+                await self.notification_system.send_check_notification(len(pending_posts), 0, 0, current_time_str)
                 return
             
             logger.info(f"Найдено {len(posts_to_publish)} постов, готовых к публикации")
             self.daily_stats['pending'] = len(posts_to_publish)
             
+            # Счетчики для уведомления
+            published_count = 0
+            errors_count = 0
+            
             for post in posts_to_publish:
-                await self.publish_post(post)
+                success = await self.publish_post(post)
+                if success:
+                    published_count += 1
+                else:
+                    errors_count += 1
+            
+            # Отправляем уведомление о результатах проверки
+            current_time_str = current_time.strftime('%H:%M:%S')
+            await self.notification_system.send_check_notification(
+                len(pending_posts), published_count, errors_count, current_time_str
+            )
                 
         except Exception as e:
             logger.error(f"Ошибка при обработке постов: {e}")
@@ -150,8 +170,8 @@ class TelegramAutomation:
                 f"Ошибка обработки постов: {str(e)}"
             )
     
-    async def publish_post(self, post: dict):
-        """Публикует один пост"""
+    async def publish_post(self, post: dict) -> bool:
+        """Публикует один пост. Возвращает True если успешно, False если ошибка"""
         row_index = post['row_index']
         post_time = post['time']
         has_images = post.get('image_urls') and len(post['image_urls']) > 0
@@ -192,6 +212,7 @@ class TelegramAutomation:
                         "Формат": "HTML" if has_images else "Markdown"
                     }
                 )
+                return True
             else:
                 # Обновляем статус на "Ошибка"
                 error_msg = "Ошибка отправки в Telegram"
@@ -201,6 +222,7 @@ class TelegramAutomation:
                 
                 # Отправляем уведомление об ошибке
                 await self.notification_system.send_error_notification(error_msg, post)
+                return False
                 
         except Exception as e:
             error_msg = f"Неожиданная ошибка: {str(e)}"
@@ -214,6 +236,7 @@ class TelegramAutomation:
             
             # Отправляем уведомление об ошибке
             await self.notification_system.send_error_notification(error_msg, post)
+            return False
     
     def _run_process_posts_thread(self):
         """Запускает обработку постов в отдельном потоке"""
