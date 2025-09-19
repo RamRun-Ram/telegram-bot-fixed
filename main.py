@@ -68,6 +68,48 @@ class TelegramAutomation:
             logger.error(f"Ошибка инициализации: {e}")
             return False
     
+    def _should_publish_post(self, post: dict, current_time: datetime) -> bool:
+        """Проверяет, подходит ли время поста для публикации"""
+        try:
+            post_date_str = post.get('date', '')
+            post_time_str = post.get('time', '')
+            
+            if not post_date_str or not post_time_str:
+                logger.warning(f"Пост из строки {post['row_index']} не имеет даты или времени")
+                return False
+            
+            # Парсим дату и время поста
+            try:
+                post_datetime = datetime.strptime(f"{post_date_str} {post_time_str}", "%Y-%m-%d %H:%M")
+                post_datetime = self.moscow_tz.localize(post_datetime)
+            except ValueError:
+                # Пробуем другие форматы
+                try:
+                    post_datetime = datetime.strptime(f"{post_date_str} {post_time_str}", "%d.%m.%Y %H:%M")
+                    post_datetime = self.moscow_tz.localize(post_datetime)
+                except ValueError:
+                    try:
+                        post_datetime = datetime.strptime(f"{post_date_str} {post_time_str}", "%Y-%m-%d %H:%M:%S")
+                        post_datetime = self.moscow_tz.localize(post_datetime)
+                    except ValueError:
+                        logger.warning(f"Не удалось распарсить дату/время поста: {post_date_str} {post_time_str}")
+                        return False
+            
+            # Проверяем, подходит ли время (в пределах LOOKBACK_MINUTES)
+            time_diff = (current_time - post_datetime).total_seconds() / 60  # в минутах
+            
+            # Пост должен быть в пределах LOOKBACK_MINUTES от текущего времени
+            if 0 <= time_diff <= LOOKBACK_MINUTES:
+                logger.info(f"Пост из строки {post['row_index']} подходит по времени (разница: {time_diff:.1f} мин)")
+                return True
+            else:
+                logger.debug(f"Пост из строки {post['row_index']} не подходит по времени (разница: {time_diff:.1f} мин)")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Ошибка проверки времени поста: {e}")
+            return False
+    
     async def process_pending_posts(self):
         """Обрабатывает посты, готовые к публикации"""
         try:
@@ -80,10 +122,26 @@ class TelegramAutomation:
                 logger.info("Нет постов для публикации")
                 return
             
-            logger.info(f"Найдено {len(pending_posts)} постов для публикации")
-            self.daily_stats['pending'] = len(pending_posts)
+            logger.info(f"Найдено {len(pending_posts)} постов со статусом 'Ожидает'")
+            
+            # Фильтруем посты по времени
+            current_time = datetime.now(self.moscow_tz)
+            posts_to_publish = []
             
             for post in pending_posts:
+                if self._should_publish_post(post, current_time):
+                    posts_to_publish.append(post)
+                else:
+                    logger.info(f"Пост из строки {post['row_index']} не подходит по времени (время: {post['time']}, дата: {post['date']})")
+            
+            if not posts_to_publish:
+                logger.info("Нет постов, готовых к публикации по времени")
+                return
+            
+            logger.info(f"Найдено {len(posts_to_publish)} постов, готовых к публикации")
+            self.daily_stats['pending'] = len(posts_to_publish)
+            
+            for post in posts_to_publish:
                 await self.publish_post(post)
                 
         except Exception as e:
