@@ -3,7 +3,7 @@
 """
 import logging
 from typing import List, Dict, Any, Optional
-from config import STATUS_PUBLISHED
+from config import STATUS_PUBLISHED, STATUS_PENDING
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +22,11 @@ class GoogleSheetsClient:
     def get_posts(self, limit: int = 10) -> List[Dict[str, Any]]:
         """Получает последние посты из Google Sheets (заглушка)"""
         logger.info(f"ЗАГЛУШКА: Получено {limit} постов из Google Sheets")
+        return []
+    
+    def get_pending_posts(self) -> List[Dict[str, Any]]:
+        """Получает посты со статусом 'Ожидает' для публикации (заглушка)"""
+        logger.info("ЗАГЛУШКА: Получены посты для публикации из Google Sheets")
         return []
     
     def update_post_status(self, row_index: int, status: str) -> bool:

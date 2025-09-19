@@ -9,7 +9,7 @@ from typing import List, Dict, Any, Optional
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
-from config import GOOGLE_SHEET_ID, GOOGLE_SHEET_NAME, STATUS_PUBLISHED
+from config import GOOGLE_SHEET_ID, GOOGLE_SHEET_NAME, STATUS_PUBLISHED, STATUS_PENDING
 
 logger = logging.getLogger(__name__)
 
@@ -128,6 +128,59 @@ class GoogleSheetsClient:
             return []
         except Exception as e:
             logger.error(f"Ошибка получения постов: {e}")
+            return []
+    
+    def get_pending_posts(self) -> List[Dict[str, Any]]:
+        """Получает посты со статусом 'Ожидает' для публикации"""
+        if not self.service:
+            logger.warning("Google Sheets API не инициализирован, возвращаем пустой список")
+            return []
+            
+        try:
+            # Получаем данные из таблицы
+            result = self.service.spreadsheets().values().get(
+                spreadsheetId=GOOGLE_SHEET_ID,
+                range=f'{GOOGLE_SHEET_NAME}!A:E'
+            ).execute()
+            
+            values = result.get('values', [])
+            if not values:
+                logger.info("Таблица пуста")
+                return []
+            
+            # Пропускаем заголовок и ищем посты со статусом "Ожидает"
+            pending_posts = []
+            for i, row in enumerate(values[1:], start=2):  # start=2 потому что пропускаем заголовок
+                if len(row) >= 5:
+                    status = row[4] if len(row) > 4 else ''
+                    if status == STATUS_PENDING:
+                        # Парсим image_urls если они есть
+                        image_urls = []
+                        if len(row) > 3 and row[3]:
+                            try:
+                                # Предполагаем, что URLs разделены запятыми
+                                image_urls = [url.strip() for url in row[3].split(',') if url.strip()]
+                            except Exception as e:
+                                logger.warning(f"Ошибка парсинга image_urls: {e}")
+                                image_urls = []
+                        
+                        pending_posts.append({
+                            'row_index': i - 1,  # Индекс строки в таблице (0-based)
+                            'date': row[0] if len(row) > 0 else '',
+                            'time': row[1] if len(row) > 1 else '',
+                            'text': row[2] if len(row) > 2 else '',
+                            'image_urls': image_urls,
+                            'status': status
+                        })
+            
+            logger.info(f"Найдено {len(pending_posts)} постов со статусом 'Ожидает'")
+            return pending_posts
+            
+        except HttpError as e:
+            logger.error(f"Ошибка Google Sheets API: {e}")
+            return []
+        except Exception as e:
+            logger.error(f"Ошибка получения постов для публикации: {e}")
             return []
     
     def update_post_status(self, row_index: int, status: str) -> bool:
