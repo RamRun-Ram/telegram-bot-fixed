@@ -10,7 +10,7 @@ import pytz
 import os
 import sys
 
-from google_sheets_client_simple import GoogleSheetsClient
+from google_sheets_client import GoogleSheetsClient
 from telegram_client import TelegramClient
 from notification_system import NotificationSystem, NotificationType
 from config import CHECK_TIMES, CHECK_INTERVAL_MINUTES, LOOKBACK_MINUTES, STATUS_PUBLISHED, STATUS_ERROR

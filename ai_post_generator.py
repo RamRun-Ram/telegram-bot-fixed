@@ -10,7 +10,7 @@ import json
 import aiohttp
 from datetime import datetime, timedelta
 from typing import List, Dict, Any
-from google_sheets_client_simple import GoogleSheetsClient
+from google_sheets_client import GoogleSheetsClient
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
