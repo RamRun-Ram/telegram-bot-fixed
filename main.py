@@ -72,6 +72,11 @@ class TelegramAutomation:
             debug_google_sheets_setup()
             
             self.sheets_client = GoogleSheetsClient()
+            
+            # Принудительно обновляем заголовки Google Sheets
+            if self.sheets_client.service:
+                logger.info("🔄 Принудительно обновляем заголовки Google Sheets...")
+                self.sheets_client.setup_headers()
             self.telegram_client = TelegramClient()
             self.notification_system = NotificationSystem(self.telegram_client)
             
