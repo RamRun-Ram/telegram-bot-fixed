@@ -21,7 +21,7 @@ class AIPostGenerator:
     def __init__(self):
         import os
         self.openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
-        self.model = os.getenv("AI_MODEL", "anthropic/claude-3.7-sonnet")
+        self.model = os.getenv("AI_MODEL", "anthropic/claude-3.5-sonnet")
         self.api_url = "https://openrouter.ai/api/v1/chat/completions"
         self.sheets_client = GoogleSheetsClient()
         
@@ -30,7 +30,11 @@ class AIPostGenerator:
             logger.error("❌ OPENROUTER_API_KEY не настроен! Установите переменную окружения OPENROUTER_API_KEY")
             self.openrouter_api_key = None
         else:
-            logger.info("✅ OpenRouter API ключ настроен")
+            # Показываем первые и последние символы ключа для диагностики
+            masked_key = f"{self.openrouter_api_key[:8]}...{self.openrouter_api_key[-8:]}" if len(self.openrouter_api_key) > 16 else "***"
+            logger.info(f"✅ OpenRouter API ключ настроен: {masked_key}")
+            logger.info(f"🔧 Модель: {self.model}")
+            logger.info(f"🔧 URL: {self.api_url}")
         
         # Системный промпт для "Архитектора Отношений"
         self.system_prompt = """Системный Промпт для AI-Агента "Архитектор Отношений"
@@ -270,40 +274,60 @@ class AIPostGenerator:
                 logger.error("❌ OpenRouter API ключ не настроен")
                 return None
             
+            # Проверяем формат API ключа
+            if not self.openrouter_api_key.startswith("sk-or-v1-"):
+                logger.warning(f"⚠️ API ключ может быть неверного формата. Ожидается 'sk-or-v1-...', получен: {self.openrouter_api_key[:10]}...")
+            
+            logger.info(f"🔑 Используем API ключ: {self.openrouter_api_key[:10]}...")
+            
             headers = {
                 "Authorization": f"Bearer {self.openrouter_api_key}",
                 "Content-Type": "application/json"
             }
             
-            data = {
-                "model": self.model,
-                "messages": [
-                    {"role": "system", "content": self.system_prompt},
-                    {"role": "user", "content": prompt}
-                ],
-                "max_tokens": 3000,
-                "temperature": 0.8
-            }
+            # Список моделей для fallback
+            models_to_try = [self.model, "anthropic/claude-3.5-sonnet", "meta-llama/llama-3.1-8b-instruct"]
             
-            logger.info(f"🤖 Отправляем запрос к OpenRouter API (модель: {self.model})")
+            for model in models_to_try:
+                data = {
+                    "model": model,
+                    "messages": [
+                        {"role": "system", "content": self.system_prompt},
+                        {"role": "user", "content": prompt}
+                    ],
+                    "max_tokens": 3000,
+                    "temperature": 0.8
+                }
+                
+                logger.info(f"🤖 Пробуем модель: {model}")
+                
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(self.api_url, headers=headers, json=data) as response:
+                        if response.status == 200:
+                            result = await response.json()
+                            content = result["choices"][0]["message"]["content"].strip()
+                            logger.info(f"✅ OpenRouter API ответил успешно с моделью {model}")
+                            return content
+                        elif response.status == 401:
+                            logger.error("❌ Ошибка аутентификации OpenRouter API (401) - проверьте API ключ")
+                            return None
+                        elif response.status == 429:
+                            logger.warning(f"⚠️ Превышен лимит запросов для модели {model}, пробуем следующую...")
+                            continue
+                        elif response.status == 400:
+                            error_text = await response.text()
+                            logger.warning(f"⚠️ Модель {model} недоступна: {error_text}, пробуем следующую...")
+                            continue
+                        else:
+                            error_text = await response.text()
+                            logger.warning(f"⚠️ Ошибка с моделью {model}: {response.status} - {error_text}, пробуем следующую...")
+                            continue
+                
+                # Если дошли до сюда, значит была ошибка, пробуем следующую модель
+                continue
             
-            async with aiohttp.ClientSession() as session:
-                async with session.post(self.api_url, headers=headers, json=data) as response:
-                    if response.status == 200:
-                        result = await response.json()
-                        content = result["choices"][0]["message"]["content"].strip()
-                        logger.info("✅ OpenRouter API ответил успешно")
-                        return content
-                    elif response.status == 401:
-                        logger.error("❌ Ошибка аутентификации OpenRouter API (401) - проверьте API ключ")
-                        return None
-                    elif response.status == 429:
-                        logger.error("❌ Превышен лимит запросов OpenRouter API (429)")
-                        return None
-                    else:
-                        error_text = await response.text()
-                        logger.error(f"❌ Ошибка API: {response.status} - {error_text}")
-                        return None
+            logger.error("❌ Все модели недоступны")
+            return None
                         
         except Exception as e:
             logger.error(f"❌ Ошибка вызова OpenRouter API: {e}")
