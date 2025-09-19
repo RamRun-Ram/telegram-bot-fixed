@@ -26,6 +26,33 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+def debug_google_sheets_setup():
+    """Диагностика настроек Google Sheets"""
+    logger.info("🔍 Проверка настроек Google Sheets...")
+    
+    google_vars = [
+        "GOOGLE_SHEET_ID", "GOOGLE_SHEET_NAME", "GOOGLE_PROJECT_ID",
+        "GOOGLE_PRIVATE_KEY_ID", "GOOGLE_PRIVATE_KEY", "GOOGLE_CLIENT_EMAIL",
+        "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_X509_CERT_URL"
+    ]
+    
+    missing_vars = []
+    for var in google_vars:
+        value = os.getenv(var)
+        if not value or value.startswith("YOUR_"):
+            missing_vars.append(var)
+            logger.error(f"❌ {var}: не установлен")
+        else:
+            logger.info(f"✅ {var}: OK")
+    
+    if missing_vars:
+        logger.error(f"❌ Отсутствуют переменные: {', '.join(missing_vars)}")
+        logger.error("📋 Установите переменные в Railway Dashboard → Settings → Variables")
+        return False
+    else:
+        logger.info("✅ Все переменные Google Sheets установлены")
+        return True
+
 class TelegramAutomation:
     """Основной класс для автоматизации публикаций"""
     
@@ -40,6 +67,10 @@ class TelegramAutomation:
         """Инициализация клиентов"""
         try:
             logger.info("Инициализация клиентов...")
+            
+            # Диагностика Google Sheets
+            debug_google_sheets_setup()
+            
             self.sheets_client = GoogleSheetsClient()
             self.telegram_client = TelegramClient()
             self.notification_system = NotificationSystem(self.telegram_client)
