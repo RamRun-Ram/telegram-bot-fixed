@@ -21,7 +21,7 @@ class AIPostGenerator:
     def __init__(self):
         import os
         self.openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
-        self.model = os.getenv("AI_MODEL", "anthropic/claude-3.7-sonnet")
+        self.model = os.getenv("AI_MODEL", "openai/gpt-3.5-turbo")
         self.api_url = "https://openrouter.ai/api/v1/chat/completions"
         self.sheets_client = GoogleSheetsClient()
         
@@ -35,6 +35,9 @@ class AIPostGenerator:
             logger.info(f"✅ OpenRouter API ключ настроен: {masked_key}")
             logger.info(f"🔧 Модель: {self.model}")
             logger.info(f"🔧 URL: {self.api_url}")
+            
+            # Тестируем API ключ при инициализации
+            asyncio.create_task(self._test_api_key())
         
         # Системный промпт для "Архитектора Отношений"
         self.system_prompt = """Системный Промпт для AI-Агента "Архитектор Отношений"
@@ -136,6 +139,34 @@ class AIPostGenerator:
 #Человечность: Цитаты о доброте, эмпатии, принятии.
 
 ТВОЯ ОСНОВНАЯ ЗАДАЧА: Создавать контент, который будет вдохновлять на отношения по любви и семье, обучать и поддерживать аудиторию в построении гармоничных и счастливых отношений, не навязчиво переобучать аудиторию тому,что они подбирали себе партнеров по внутренним ценностям, а не по внешним признакам ил по денежному достатку партнера"""
+
+    async def _test_api_key(self):
+        """Тестирует API ключ при инициализации"""
+        try:
+            logger.info("🧪 Тестируем API ключ...")
+            
+            headers = {
+                "Authorization": f"Bearer {self.openrouter_api_key}",
+                "Content-Type": "application/json"
+            }
+            
+            data = {
+                "model": "openai/gpt-3.5-turbo",
+                "messages": [{"role": "user", "content": "Тест"}],
+                "max_tokens": 5
+            }
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.post(self.api_url, headers=headers, json=data) as response:
+                    if response.status == 200:
+                        logger.info("✅ API ключ работает!")
+                    elif response.status == 401:
+                        logger.error("❌ API ключ неверный или истек!")
+                    else:
+                        logger.warning(f"⚠️ API ключ тест: статус {response.status}")
+                        
+        except Exception as e:
+            logger.error(f"❌ Ошибка тестирования API ключа: {e}")
 
     async def generate_weekly_posts(self) -> List[Dict[str, Any]]:
         """Генерирует посты на 3 дня (9 постов)"""
