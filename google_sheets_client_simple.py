@@ -29,6 +29,11 @@ class GoogleSheetsClient:
         logger.info("ЗАГЛУШКА: Получены посты для публикации из Google Sheets")
         return []
     
+    def get_all_posts(self) -> List[Dict[str, Any]]:
+        """Получает все посты из Google Sheets (заглушка)"""
+        logger.info("ЗАГЛУШКА: Получены все посты из Google Sheets")
+        return []
+    
     def update_post_status(self, row_index: int, status: str) -> bool:
         """Обновляет статус поста в Google Sheets (заглушка)"""
         logger.info(f"ЗАГЛУШКА: Статус поста {row_index} обновлен на {status}")

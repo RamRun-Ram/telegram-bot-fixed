@@ -183,6 +183,57 @@ class GoogleSheetsClient:
             logger.error(f"Ошибка получения постов для публикации: {e}")
             return []
     
+    def get_all_posts(self) -> List[Dict[str, Any]]:
+        """Получает все посты из Google Sheets"""
+        if not self.service:
+            logger.warning("Google Sheets API не инициализирован, возвращаем пустой список")
+            return []
+            
+        try:
+            # Получаем данные из таблицы
+            result = self.service.spreadsheets().values().get(
+                spreadsheetId=GOOGLE_SHEET_ID,
+                range=f'{GOOGLE_SHEET_NAME}!A:E'
+            ).execute()
+            
+            values = result.get('values', [])
+            if not values:
+                logger.info("Таблица пуста")
+                return []
+            
+            # Пропускаем заголовок и возвращаем все посты
+            all_posts = []
+            for i, row in enumerate(values[1:], start=2):  # start=2 потому что пропускаем заголовок
+                if len(row) >= 5:
+                    # Парсим image_urls если они есть
+                    image_urls = []
+                    if len(row) > 3 and row[3]:
+                        try:
+                            # Предполагаем, что URLs разделены запятыми
+                            image_urls = [url.strip() for url in row[3].split(',') if url.strip()]
+                        except Exception as e:
+                            logger.warning(f"Ошибка парсинга image_urls: {e}")
+                            image_urls = []
+                    
+                    all_posts.append({
+                        'row_index': i - 1,  # Индекс строки в таблице (0-based)
+                        'date': row[0] if len(row) > 0 else '',
+                        'time': row[1] if len(row) > 1 else '',
+                        'text': row[2] if len(row) > 2 else '',
+                        'image_urls': image_urls,
+                        'status': row[4] if len(row) > 4 else ''
+                    })
+            
+            logger.info(f"Получено {len(all_posts)} постов из Google Sheets")
+            return all_posts
+            
+        except HttpError as e:
+            logger.error(f"Ошибка Google Sheets API: {e}")
+            return []
+        except Exception as e:
+            logger.error(f"Ошибка получения всех постов: {e}")
+            return []
+    
     def update_post_status(self, row_index: int, status: str) -> bool:
         """Обновляет статус поста в Google Sheets"""
         if not self.service:
