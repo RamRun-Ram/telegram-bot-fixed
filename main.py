@@ -1,0 +1,265 @@
+"""
+Основной скрипт для автоматизации публикаций в Telegram-канал из Google Sheets
+"""
+import asyncio
+import logging
+import threading
+import time
+from datetime import datetime, time as dt_time
+import pytz
+import os
+import sys
+
+from google_sheets_client_simple import GoogleSheetsClient
+from telegram_client import TelegramClient
+from notification_system import NotificationSystem, NotificationType
+from config import CHECK_TIMES, CHECK_INTERVAL_MINUTES, LOOKBACK_MINUTES, STATUS_PUBLISHED, STATUS_ERROR
+
+# Настройка логирования
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('telegram_automation.log'),
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+logger = logging.getLogger(__name__)
+
+class TelegramAutomation:
+    """Основной класс для автоматизации публикаций"""
+    
+    def __init__(self):
+        self.sheets_client = None
+        self.telegram_client = None
+        self.notification_system = None
+        self.moscow_tz = pytz.timezone('Europe/Moscow')
+        self.daily_stats = {'published': 0, 'errors': 0, 'pending': 0}
+        
+    async def initialize(self):
+        """Инициализация клиентов"""
+        try:
+            logger.info("Инициализация клиентов...")
+            self.sheets_client = GoogleSheetsClient()
+            self.telegram_client = TelegramClient()
+            self.notification_system = NotificationSystem(self.telegram_client)
+            
+            # Проверяем соединение с Telegram
+            if not await self.telegram_client.test_connection():
+                raise Exception("Не удалось подключиться к Telegram Bot API")
+            
+            logger.info("Клиенты успешно инициализированы")
+            
+            # Отправляем уведомление о запуске
+            await self.notification_system.send_info_notification(
+                "🚀 Система автоматизации запущена",
+                {
+                    "время": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                    "проверка": f"каждые {CHECK_INTERVAL_MINUTES} минут",
+                    "поиск": f"за последние {LOOKBACK_MINUTES} минут",
+                    "канал": "@sovpalitest",
+                    "статус": "готов к работе"
+                }
+            )
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Ошибка инициализации: {e}")
+            return False
+    
+    async def process_pending_posts(self):
+        """Обрабатывает посты, готовые к публикации"""
+        try:
+            logger.info("Начинаем обработку постов...")
+            
+            # Получаем список постов для публикации
+            pending_posts = self.sheets_client.get_pending_posts()
+            
+            if not pending_posts:
+                logger.info("Нет постов для публикации")
+                return
+            
+            logger.info(f"Найдено {len(pending_posts)} постов для публикации")
+            self.daily_stats['pending'] = len(pending_posts)
+            
+            for post in pending_posts:
+                await self.publish_post(post)
+                
+        except Exception as e:
+            logger.error(f"Ошибка при обработке постов: {e}")
+            await self.notification_system.send_error_notification(
+                f"Ошибка обработки постов: {str(e)}"
+            )
+    
+    async def publish_post(self, post: dict):
+        """Публикует один пост"""
+        row_index = post['row_index']
+        post_time = post['time']
+        has_images = post.get('image_urls') and len(post['image_urls']) > 0
+        
+        try:
+            logger.info(f"Публикуем пост из строки {row_index} (время: {post_time})")
+            logger.info(f"🖼️ Изображения: {'да' if has_images else 'нет'}")
+            
+            # Определяем метод публикации по наличию изображений
+            if has_images:
+                # Пост С изображениями - HTML метод
+                logger.info("🖼️ Пост с изображениями - используем HTML метод")
+                success = await self.telegram_client.send_html_post_with_image(
+                    text=post['text'],
+                    image_urls=post['image_urls']
+                )
+            else:
+                # Пост БЕЗ изображений - Markdown метод
+                logger.info("📝 Пост без изображений - используем Markdown метод")
+                success = await self.telegram_client.send_markdown_post(
+                    text=post['text']
+                )
+            
+            if success:
+                # Обновляем статус на "Опубликовано"
+                self.sheets_client.update_post_status(row_index, STATUS_PUBLISHED)
+                self.daily_stats['published'] += 1
+                logger.info(f"Пост из строки {row_index} успешно опубликован")
+                
+                # Отправляем уведомление об успехе
+                await self.notification_system.send_info_notification(
+                    "Пост опубликован",
+                    {
+                        "Дата": post['date'],
+                        "Время": post['time'],
+                        "Длина": f"{len(post['text'])} символов",
+                        "Изображения": "да" if has_images else "нет",
+                        "Формат": "HTML" if has_images else "Markdown"
+                    }
+                )
+            else:
+                # Обновляем статус на "Ошибка"
+                error_msg = "Ошибка отправки в Telegram"
+                self.sheets_client.update_post_status(row_index, STATUS_ERROR, error_msg)
+                self.daily_stats['errors'] += 1
+                logger.error(f"Ошибка публикации поста из строки {row_index}")
+                
+                # Отправляем уведомление об ошибке
+                await self.notification_system.send_error_notification(error_msg, post)
+                
+        except Exception as e:
+            error_msg = f"Неожиданная ошибка: {str(e)}"
+            logger.error(f"Ошибка публикации поста из строки {row_index}: {e}")
+            
+            try:
+                self.sheets_client.update_post_status(row_index, STATUS_ERROR, error_msg)
+                self.daily_stats['errors'] += 1
+            except Exception as update_error:
+                logger.error(f"Ошибка обновления статуса: {update_error}")
+            
+            # Отправляем уведомление об ошибке
+            await self.notification_system.send_error_notification(error_msg, post)
+    
+    def _run_process_posts_thread(self):
+        """Запускает обработку постов в отдельном потоке"""
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(self.process_pending_posts())
+            loop.close()
+        except Exception as e:
+            logger.error(f"Ошибка в _run_process_posts_thread: {e}")
+    
+    def _schedule_worker(self):
+        """Рабочий поток для расписания"""
+        logger.info("Запуск системы автоматических проверок...")
+        logger.info("Время работы: 8:01 - 22:01 (МСК)")
+        logger.info("Время отдыха: 23:00 - 7:00 (МСК)")
+        logger.info(f"Проверяем каждые {CHECK_INTERVAL_MINUTES} минут")
+        logger.info(f"Ищем посты за последние {LOOKBACK_MINUTES} минут")
+        
+        while True:
+            try:
+                current_time = datetime.now(self.moscow_tz)
+                current_hour = current_time.hour
+                
+                # Проверяем, нужно ли работать сейчас (8:00 - 22:00)
+                if 8 <= current_hour <= 22:
+                    logger.info(f"🕐 Рабочее время: {current_time.strftime('%H:%M')} - проверяем посты")
+                    
+                    # Запускаем обработку в отдельном потоке
+                    thread = threading.Thread(target=self._run_process_posts_thread)
+                    thread.daemon = True
+                    thread.start()
+                    thread.join()  # Ждем завершения
+                else:
+                    logger.info(f"😴 Время отдыха: {current_time.strftime('%H:%M')} - пропускаем проверку")
+                
+                # Ждем 10 минут до следующей проверки
+                time.sleep(600)
+                
+            except Exception as e:
+                logger.error(f"Ошибка в _schedule_worker: {e}")
+                time.sleep(600)
+    
+    async def run_scheduled_checks(self):
+        """Запускает проверки по расписанию"""
+        # Запускаем рабочий поток в фоне
+        schedule_thread = threading.Thread(target=self._schedule_worker)
+        schedule_thread.daemon = True
+        schedule_thread.start()
+        
+        # Основной поток ждет
+        try:
+            while True:
+                await asyncio.sleep(1)
+        except KeyboardInterrupt:
+            logger.info("Получен сигнал остановки")
+    
+    async def run_manual_check(self):
+        """Запускает ручную проверку (для тестирования)"""
+        logger.info("Запуск ручной проверки...")
+        await self.process_pending_posts()
+    
+    def run(self, manual=False):
+        """Основной метод запуска"""
+        try:
+            # Инициализируем клиентов
+            if not asyncio.run(self.initialize()):
+                logger.error("Не удалось инициализировать клиенты")
+                return
+            
+            if manual:
+                # Ручная проверка
+                asyncio.run(self.run_manual_check())
+            else:
+                # Автоматические проверки по расписанию
+                asyncio.run(self.run_scheduled_checks())
+                
+        except KeyboardInterrupt:
+            logger.info("Получен сигнал остановки")
+        except Exception as e:
+            logger.error(f"Критическая ошибка: {e}")
+
+def main():
+    """Точка входа в приложение"""
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='Автоматизация публикаций в Telegram-канал')
+    parser.add_argument('--manual', action='store_true', 
+                       help='Запустить ручную проверку вместо автоматического режима')
+    parser.add_argument('--test', action='store_true',
+                       help='Тестировать соединения без публикации постов')
+    
+    args = parser.parse_args()
+    
+    automation = TelegramAutomation()
+    
+    if args.test:
+        # Тестовый режим
+        logger.info("Тестовый режим: проверка соединений...")
+        asyncio.run(automation.initialize())
+        logger.info("Тест завершен")
+    else:
+        # Основной режим
+        automation.run(manual=args.manual)
+
+if __name__ == "__main__":
+    main()
