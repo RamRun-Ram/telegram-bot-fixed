@@ -36,8 +36,7 @@ class AIPostGenerator:
             logger.info(f"🔧 Модель: {self.model}")
             logger.info(f"🔧 URL: {self.api_url}")
             
-            # Тестируем API ключ при инициализации
-            asyncio.create_task(self._test_api_key())
+            # API ключ настроен, тестирование будет при первом использовании
         
         # Системный промпт для "Архитектора Отношений"
         self.system_prompt = """Системный Промпт для AI-Агента "Архитектор Отношений"
@@ -140,8 +139,8 @@ class AIPostGenerator:
 
 ТВОЯ ОСНОВНАЯ ЗАДАЧА: Создавать контент, который будет вдохновлять на отношения по любви и семье, обучать и поддерживать аудиторию в построении гармоничных и счастливых отношений, не навязчиво переобучать аудиторию тому,что они подбирали себе партнеров по внутренним ценностям, а не по внешним признакам ил по денежному достатку партнера"""
 
-    async def _test_api_key(self):
-        """Тестирует API ключ при инициализации"""
+    def _test_api_key_sync(self):
+        """Синхронное тестирование API ключа"""
         try:
             logger.info("🧪 Тестируем API ключ...")
             
@@ -156,21 +155,31 @@ class AIPostGenerator:
                 "max_tokens": 5
             }
             
-            async with aiohttp.ClientSession() as session:
-                async with session.post(self.api_url, headers=headers, json=data) as response:
-                    if response.status == 200:
-                        logger.info("✅ API ключ работает!")
-                    elif response.status == 401:
-                        logger.error("❌ API ключ неверный или истек!")
-                    else:
-                        logger.warning(f"⚠️ API ключ тест: статус {response.status}")
+            import requests
+            response = requests.post(self.api_url, headers=headers, json=data, timeout=10)
+            
+            if response.status_code == 200:
+                logger.info("✅ API ключ работает!")
+                return True
+            elif response.status_code == 401:
+                logger.error("❌ API ключ неверный или истек!")
+                return False
+            else:
+                logger.warning(f"⚠️ API ключ тест: статус {response.status_code}")
+                return False
                         
         except Exception as e:
             logger.error(f"❌ Ошибка тестирования API ключа: {e}")
+            return False
 
     async def generate_weekly_posts(self) -> List[Dict[str, Any]]:
         """Генерирует посты на 3 дня (9 постов)"""
         logger.info("🎯 Начинаем генерацию постов на 3 дня")
+        
+        # Тестируем API ключ перед генерацией
+        if not self._test_api_key_sync():
+            logger.error("❌ API ключ не работает, пропускаем генерацию")
+            return []
         
         posts = []
         start_date = datetime.now()

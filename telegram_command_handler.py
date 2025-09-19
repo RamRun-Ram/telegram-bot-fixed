@@ -24,9 +24,16 @@ class TelegramCommandHandler:
         
         self.bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
         self.sheets_client = GoogleSheetsClient()
-        self.ai_generator = AIPostGenerator()
+        self.ai_generator = None  # Инициализируем лениво
         self.setup_handlers()
         logger.info("TelegramCommandHandler инициализирован успешно")
+    
+    def get_ai_generator(self):
+        """Ленивая инициализация AI генератора"""
+        if self.ai_generator is None:
+            logger.info("Инициализация AI генератора...")
+            self.ai_generator = AIPostGenerator()
+        return self.ai_generator
     
     def setup_handlers(self):
         """Настройка обработчиков команд"""
@@ -121,7 +128,7 @@ class TelegramCommandHandler:
             def generate_posts():
                 try:
                     logger.info("Начинаем генерацию постов по команде из Telegram")
-                    success = asyncio.run(self.ai_generator.generate_and_upload_weekly_posts())
+                    success = asyncio.run(self.get_ai_generator().generate_and_upload_weekly_posts())
                     
                     if success:
                         # Обновляем статус
