@@ -17,27 +17,36 @@ class TelegramCommandHandler:
     """Обработчик команд Telegram для управления постами"""
     
     def __init__(self):
+        logger.info(f"Инициализация TelegramCommandHandler...")
+        logger.info(f"TELEGRAM_BOT_TOKEN: {'установлен' if TELEGRAM_BOT_TOKEN and TELEGRAM_BOT_TOKEN != 'YOUR_TELEGRAM_BOT_TOKEN' else 'НЕ УСТАНОВЛЕН'}")
+        logger.info(f"COMMAND_CHANNEL_ID: {COMMAND_CHANNEL_ID}")
+        logger.info(f"NOTIFICATION_CHANNEL_ID: {NOTIFICATION_CHANNEL_ID}")
+        
         self.bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
         self.sheets_client = GoogleSheetsClient()
         self.ai_generator = AIPostGenerator()
         self.setup_handlers()
+        logger.info("TelegramCommandHandler инициализирован успешно")
     
     def setup_handlers(self):
         """Настройка обработчиков команд"""
         
         def is_authorized_user(message):
             """Проверяет, что пользователь авторизован для использования команд"""
+            logger.info(f"Проверка авторизации: чат {message.chat.id}, тип {message.chat.type}, текст '{message.text}'")
+            logger.info(f"Ожидаемый COMMAND_CHANNEL_ID: {COMMAND_CHANNEL_ID}")
+            
             # Разрешаем команды из группы AlertChanel
             if str(message.chat.id) == COMMAND_CHANNEL_ID or message.chat.username == "alertchanel":
-                logger.info(f"Команда из группы AlertChanel: {message.text}")
+                logger.info(f"✅ Команда из группы AlertChanel: {message.text}")
                 return True
             
             # Разрешаем команды из личных сообщений (для тестирования)
             if message.chat.type == 'private':
-                logger.info(f"Команда из личного чата: {message.text}")
+                logger.info(f"✅ Команда из личного чата: {message.text}")
                 return True
             
-            logger.info(f"Команда отклонена из чата {message.chat.id} (тип: {message.chat.type}): {message.text}")
+            logger.warning(f"❌ Команда отклонена из чата {message.chat.id} (тип: {message.chat.type}): {message.text}")
             return False
         
         @self.bot.message_handler(commands=['start'])
@@ -215,6 +224,17 @@ class TelegramCommandHandler:
         """Запуск бота в режиме polling"""
         try:
             logger.info("Запуск Telegram бота для обработки команд...")
+            logger.info(f"Ожидаем команды в канале: {COMMAND_CHANNEL_ID}")
+            logger.info("Доступные команды: /start, /help, /post, /status, или просто 'пост'")
+            
+            # Тестируем подключение к боту
+            try:
+                bot_info = self.bot.get_me()
+                logger.info(f"Бот подключен: @{bot_info.username} (ID: {bot_info.id})")
+            except Exception as e:
+                logger.error(f"Ошибка подключения к боту: {e}")
+                return
+            
             self.bot.polling(none_stop=True, interval=1)
         except Exception as e:
             logger.error(f"Ошибка при запуске бота: {e}")
