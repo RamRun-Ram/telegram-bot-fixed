@@ -5,7 +5,7 @@ import asyncio
 import logging
 import threading
 import time
-from datetime import datetime, time as dt_time
+from datetime import datetime, time as dt_time, timedelta
 import pytz
 import os
 import sys
@@ -13,7 +13,7 @@ import sys
 from google_sheets_client import GoogleSheetsClient
 from telegram_client import TelegramClient
 from notification_system import NotificationSystem, NotificationType
-from config import CHECK_TIMES, CHECK_INTERVAL_MINUTES, LOOKBACK_MINUTES, STATUS_PUBLISHED, STATUS_ERROR
+from config import CHECK_TIMES, CHECK_INTERVAL_MINUTES, LOOKBACK_MINUTES, STATUS_PUBLISHED, STATUS_ERROR, STATUS_PENDING
 
 # Настройка логирования
 logging.basicConfig(
@@ -53,6 +53,85 @@ def debug_google_sheets_setup():
         logger.info("✅ Все переменные Google Sheets установлены")
         return True
 
+def add_test_posts_to_sheets(sheets_client):
+    """Добавляет 10 тестовых постов в Google Sheets для тестирования"""
+    try:
+        logger.info("🧪 Добавляем тестовые посты для проверки системы...")
+        
+        # Получаем текущее время по Москве
+        moscow_tz = pytz.timezone('Europe/Moscow')
+        now = datetime.now(moscow_tz)
+        
+        # Создаем 10 тестовых постов
+        test_posts = []
+        
+        # 5 постов с изображениями (дневные) - каждые 2 минуты
+        for i in range(5):
+            post_time = now + timedelta(minutes=2 + i*2)
+            test_posts.append({
+                "date": post_time.strftime("%d.%m.%y"),
+                "time": post_time.strftime("%H:%M"),
+                "text": f"<b>ТЕСТОВЫЙ ПОСТ #{i+1} (С ИЗОБРАЖЕНИЕМ)</b><br><br>Это тестовый пост для проверки автоматической публикации в Telegram-канал. Пост содержит HTML-разметку и должен быть опубликован с изображением.<br><br><i>Время публикации:</i> {post_time.strftime('%H:%M')}<br><br>Этот пост используется для тестирования системы автоматизации.",
+                "prompt_ru": "",
+                "prompt_en": f"A couple in a cozy coffee shop, sitting opposite each other, sincerely laughing, completely relaxed, natural, without masks, warm lighting, atmosphere of trust, close-up, photorealistic, depth of field --test{i+1}",
+                "image_urls": f"https://picsum.photos/800/600?random={i+1}",
+                "status": STATUS_PENDING
+            })
+        
+        # 5 постов без изображений - каждые 2 минуты, начиная с +12 минут
+        for i in range(5):
+            post_time = now + timedelta(minutes=12 + i*2)
+            if i % 2 == 0:
+                # Утренние цитаты
+                test_posts.append({
+                    "date": post_time.strftime("%d.%m.%y"),
+                    "time": post_time.strftime("%H:%M"),
+                    "text": f"> Тестовая цитата #{i+1}: Любовь — это не тогда, когда вы смотрите друг на друга, а когда вы смотрите в одном направлении.",
+                    "prompt_ru": "",
+                    "prompt_en": "",
+                    "image_urls": "",
+                    "status": STATUS_PENDING
+                })
+            else:
+                # Вечерние посты
+                test_posts.append({
+                    "date": post_time.strftime("%d.%m.%y"),
+                    "time": post_time.strftime("%H:%M"),
+                    "text": f"**ТЕСТОВЫЙ ВЕЧЕРНИЙ ПОСТ #{i+1}**\n\nЭто тестовый вечерний пост для проверки автоматической публикации. Пост написан в формате Markdown и не содержит изображений.\n\n*Время публикации:* {post_time.strftime('%H:%M')}\n\nЭтот пост используется для тестирования системы автоматизации без изображений.",
+                    "prompt_ru": "",
+                    "prompt_en": "",
+                    "image_urls": "",
+                    "status": STATUS_PENDING
+                })
+        
+        # Добавляем посты в таблицу
+        success_count = 0
+        for i, post in enumerate(test_posts):
+            try:
+                result = sheets_client.add_post(post)
+                if result:
+                    logger.info(f"✅ Тестовый пост {i+1}/10 добавлен: {post['date']} {post['time']}")
+                    success_count += 1
+                else:
+                    logger.error(f"❌ Ошибка добавления тестового поста {i+1}/10")
+            except Exception as e:
+                logger.error(f"❌ Ошибка добавления тестового поста {i+1}/10: {e}")
+        
+        logger.info(f"📊 Тестовые посты добавлены: {success_count}/{len(test_posts)}")
+        
+        if success_count > 0:
+            logger.info("🎯 Тестовые посты успешно добавлены!")
+            logger.info(f"⏰ Первый пост будет опубликован через 2 минуты")
+            logger.info(f"⏰ Последний пост будет опубликован через {2 + (len(test_posts)-1)*2} минут")
+            return True
+        else:
+            logger.error("❌ Не удалось добавить тестовые посты")
+            return False
+            
+    except Exception as e:
+        logger.error(f"❌ Ошибка добавления тестовых постов: {e}")
+        return False
+
 class TelegramAutomation:
     """Основной класс для автоматизации публикаций"""
     
@@ -77,6 +156,9 @@ class TelegramAutomation:
             if self.sheets_client.service:
                 logger.info("🔄 Принудительно обновляем заголовки Google Sheets...")
                 self.sheets_client.setup_headers()
+                
+                # Добавляем тестовые посты для проверки системы
+                add_test_posts_to_sheets(self.sheets_client)
             self.telegram_client = TelegramClient()
             self.notification_system = NotificationSystem(self.telegram_client)
             
@@ -309,12 +391,12 @@ class TelegramAutomation:
                 else:
                     logger.info(f"😴 Время отдыха: {current_time.strftime('%H:%M')} - пропускаем проверку")
                 
-                # Ждем 10 минут до следующей проверки
-                time.sleep(600)
+                # Ждем CHECK_INTERVAL_MINUTES минут до следующей проверки
+                time.sleep(CHECK_INTERVAL_MINUTES * 60)
                 
             except Exception as e:
                 logger.error(f"Ошибка в _schedule_worker: {e}")
-                time.sleep(600)
+                time.sleep(CHECK_INTERVAL_MINUTES * 60)
     
     async def run_scheduled_checks(self):
         """Запускает проверки по расписанию"""
