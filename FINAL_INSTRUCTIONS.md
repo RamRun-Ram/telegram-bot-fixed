@@ -73,7 +73,7 @@ GOOGLE_CLIENT_X509_CERT_URL=https://www.googleapis.com/robot/v1/metadata/x509/yo
 
 **AI настройки:**
 ```
-OPENROUTER_API_KEY=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
+OPENROUTER_API_KEY=YOUR_OPENROUTER_API_KEY
 AI_MODEL=anthropic/claude-3.7-sonnet
 ```
 
