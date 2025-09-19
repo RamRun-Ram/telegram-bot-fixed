@@ -9,7 +9,7 @@ from typing import Optional
 import telebot
 from ai_post_generator import AIPostGenerator
 from ai_post_generator_stub import AIPostGeneratorStub
-from google_sheets_client_simple import GoogleSheetsClient
+from google_sheets_client import GoogleSheetsClient
 from config import TELEGRAM_BOT_TOKEN, NOTIFICATION_CHANNEL_ID, COMMAND_CHANNEL_ID
 
 logger = logging.getLogger(__name__)
@@ -145,11 +145,13 @@ class TelegramCommandHandler:
                     if success:
                         # Обновляем статус
                         self.bot.edit_message_text(
-                            "✅ Посты успешно сгенерированы и загружены в Google Таблицу!\n\n"
+                            "✅ Посты успешно сгенерированы!\n\n"
                             "📊 Создано 9 постов на 3 дня:\n"
                             "• 3 утренних поста (08:00)\n"
                             "• 3 обеденных поста (14:00) с изображениями\n"
                             "• 3 вечерних поста (20:00)\n\n"
+                            "⚠️ Google Sheets не настроен - посты не загружены в таблицу\n"
+                            "📋 Настройте Google Sheets API для полной функциональности\n\n"
                             "🚀 Посты будут автоматически опубликованы по расписанию!",
                             chat_id=message.chat.id,
                             message_id=status_msg.message_id

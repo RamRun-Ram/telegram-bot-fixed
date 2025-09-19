@@ -128,18 +128,25 @@ class AIPostGeneratorStub:
         
         for i, post in enumerate(posts):
             try:
+                # Парсим scheduled_time в date и time
+                from datetime import datetime
+                scheduled_time = datetime.strptime(post["scheduled_time"], "%Y-%m-%d %H:%M")
+                
                 # Форматируем данные поста для Google Sheets
                 post_data = {
+                    "date": scheduled_time.strftime("%Y-%m-%d"),
+                    "time": scheduled_time.strftime("%H:%M"),
                     "text": post["text"],
                     "image_urls": ", ".join(post["image_urls"]) if post["image_urls"] else "",
-                    "category": post["category"],
-                    "scheduled_time": post["scheduled_time"],
                     "status": post["status"]
                 }
                 
                 # Добавляем пост в таблицу
-                self.sheets_client.add_post(post_data)
-                logger.info(f"✅ Пост {i+1}/{len(posts)} загружен в таблицу")
+                result = self.sheets_client.add_post(post_data)
+                if result:
+                    logger.info(f"✅ Пост {i+1}/{len(posts)} загружен в таблицу")
+                else:
+                    logger.error(f"❌ Ошибка загрузки поста {i+1}")
                 
             except Exception as e:
                 logger.error(f"❌ Ошибка при загрузке поста {i+1}: {e}")
