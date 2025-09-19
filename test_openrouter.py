@@ -23,11 +23,12 @@ async def test_openrouter_api():
     
     # Список моделей для тестирования
     models_to_test = [
+        "google/gemini-2.5-flash-lite-preview-06-17",
+        "google/gemini-pro",
         "anthropic/claude-3.5-sonnet",
         "anthropic/claude-3.7-sonnet", 
         "meta-llama/llama-3.1-8b-instruct",
-        "openai/gpt-3.5-turbo",
-        "google/gemini-pro"
+        "openai/gpt-3.5-turbo"
     ]
     
     headers = {

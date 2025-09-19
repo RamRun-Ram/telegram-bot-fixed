@@ -21,7 +21,7 @@ class AIPostGenerator:
     def __init__(self):
         import os
         self.openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
-        self.model = os.getenv("AI_MODEL", "openai/gpt-3.5-turbo")
+        self.model = os.getenv("AI_MODEL", "google/gemini-2.5-flash-lite-preview-06-17")
         self.api_url = "https://openrouter.ai/api/v1/chat/completions"
         self.sheets_client = GoogleSheetsClient()
         
@@ -150,7 +150,7 @@ class AIPostGenerator:
             }
             
             data = {
-                "model": "openai/gpt-3.5-turbo",
+                "model": "google/gemini-2.5-flash-lite-preview-06-17",
                 "messages": [{"role": "user", "content": "Тест"}],
                 "max_tokens": 5
             }
@@ -335,7 +335,7 @@ class AIPostGenerator:
             }
             
             # Список моделей для fallback
-            models_to_try = [self.model, "anthropic/claude-3.5-sonnet", "meta-llama/llama-3.1-8b-instruct", "openai/gpt-3.5-turbo"]
+            models_to_try = [self.model, "google/gemini-pro", "anthropic/claude-3.5-sonnet", "meta-llama/llama-3.1-8b-instruct", "openai/gpt-3.5-turbo"]
             
             for model in models_to_try:
                 data = {
