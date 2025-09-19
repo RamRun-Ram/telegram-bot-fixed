@@ -235,9 +235,30 @@ class TelegramCommandHandler:
                 logger.error(f"Ошибка подключения к боту: {e}")
                 return
             
-            self.bot.polling(none_stop=True, interval=1)
+            # Очищаем webhook перед запуском polling
+            try:
+                self.bot.remove_webhook()
+                logger.info("Webhook очищен перед запуском polling")
+            except Exception as e:
+                logger.warning(f"Не удалось очистить webhook: {e}")
+            
+            # Запускаем polling с обработкой ошибок
+            logger.info("Запуск polling...")
+            self.bot.polling(none_stop=True, interval=1, timeout=20)
+            
         except Exception as e:
             logger.error(f"Ошибка при запуске бота: {e}")
+            # Если ошибка 409, ждем и пробуем снова
+            if "409" in str(e) or "Conflict" in str(e):
+                logger.warning("Обнаружен конфликт - другой экземпляр бота уже запущен")
+                logger.info("Ожидание 30 секунд перед повторной попыткой...")
+                import time
+                time.sleep(30)
+                logger.info("Повторная попытка запуска...")
+                try:
+                    self.bot.polling(none_stop=True, interval=1, timeout=20)
+                except Exception as retry_e:
+                    logger.error(f"Ошибка при повторной попытке: {retry_e}")
     
     def stop_polling(self):
         """Остановка бота"""

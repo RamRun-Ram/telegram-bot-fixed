@@ -39,10 +39,26 @@ def signal_handler(signum, frame):
 def run_command_handler():
     """Запуск обработчика команд в отдельном потоке"""
     try:
+        logger.info("Инициализация обработчика команд...")
         handler = TelegramCommandHandler()
+        
+        # Небольшая задержка перед запуском polling
+        import time
+        time.sleep(5)
+        
+        logger.info("Запуск обработчика команд...")
         handler.start_polling()
     except Exception as e:
         logger.error(f"Ошибка в обработчике команд: {e}")
+        # Если ошибка 409, ждем и пробуем снова
+        if "409" in str(e) or "Conflict" in str(e):
+            logger.warning("Конфликт обнаружен, ожидание 60 секунд...")
+            time.sleep(60)
+            try:
+                handler = TelegramCommandHandler()
+                handler.start_polling()
+            except Exception as retry_e:
+                logger.error(f"Ошибка при повторной попытке: {retry_e}")
 
 def run_main_automation():
     """Запуск основного приложения автоматизации"""
@@ -73,15 +89,19 @@ async def main():
         health_thread.daemon = True
         health_thread.start()
         
-        # Запускаем обработчик команд в отдельном потоке
-        command_thread = threading.Thread(target=run_command_handler)
-        command_thread.daemon = True
-        command_thread.start()
-        
         # Запускаем основное приложение в отдельном потоке
         automation_thread = threading.Thread(target=run_main_automation)
         automation_thread.daemon = True
         automation_thread.start()
+        
+        # Небольшая задержка перед запуском обработчика команд
+        import time
+        time.sleep(10)
+        
+        # Запускаем обработчик команд в отдельном потоке
+        command_thread = threading.Thread(target=run_command_handler)
+        command_thread.daemon = True
+        command_thread.start()
         
         # Ждем завершения
         automation_thread.join()
