@@ -588,15 +588,15 @@ Prompt:"""
             logger.info(f"📤 Загружаем {len(posts)} постов в Google Таблицу")
             
             for post in posts:
-                # Преобразуем пост в правильный формат для add_post
+                # Преобразуем пост в правильный формат для add_post (правильный порядок)
                 post_data = {
                     "date": post["date"],
                     "time": post["time"],
                     "text": post["post"],
-                    "image_urls": post["image"] if post["image"] else "",
-                    "status": post["status"],
                     "prompt_ru": post.get("prompt_ru", ""),
-                    "prompt_en": post.get("prompt_en", "")
+                    "prompt_en": post.get("prompt_en", ""),
+                    "image_urls": post["image"] if post["image"] else "",
+                    "status": post["status"]
                 }
                 
                 result = self.sheets_client.add_post(post_data)

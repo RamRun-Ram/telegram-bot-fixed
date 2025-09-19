@@ -91,16 +91,16 @@ class GoogleSheetsClient:
             return True
             
         try:
-            # Подготавливаем данные для записи
+            # Подготавливаем данные для записи (правильный порядок колонок)
             values = [
                 [
                     post_data.get('date', ''),
                     post_data.get('time', ''),
                     post_data.get('text', ''),
-                    post_data.get('image_urls', ''),
-                    STATUS_PUBLISHED,
                     post_data.get('prompt_ru', ''),
-                    post_data.get('prompt_en', '')
+                    post_data.get('prompt_en', ''),
+                    post_data.get('image_urls', ''),
+                    STATUS_PUBLISHED
                 ]
             ]
             
@@ -156,10 +156,10 @@ class GoogleSheetsClient:
                         'date': row[0] if len(row) > 0 else '',
                         'time': row[1] if len(row) > 1 else '',
                         'text': row[2] if len(row) > 2 else '',
-                        'image_urls': row[3] if len(row) > 3 else '',
-                        'status': row[4] if len(row) > 4 else '',
-                        'prompt_ru': row[5] if len(row) > 5 else '',
-                        'prompt_en': row[6] if len(row) > 6 else ''
+                        'prompt_ru': row[3] if len(row) > 3 else '',
+                        'prompt_en': row[4] if len(row) > 4 else '',
+                        'image_urls': row[5] if len(row) > 5 else '',
+                        'status': row[6] if len(row) > 6 else ''
                     }
                     posts.append(post)
             
@@ -197,20 +197,20 @@ class GoogleSheetsClient:
             # Фильтруем посты со статусом "Ожидает"
             pending_posts = []
             for i, row in enumerate(values[1:], start=2):  # Пропускаем заголовок, начинаем с строки 2
-                if len(row) >= 5 and row[4] == STATUS_PENDING:  # Проверяем статус в колонке E
+                if len(row) >= 7 and row[6] == STATUS_PENDING:  # Проверяем статус в колонке G (7-я колонка)
                     # Парсим URL изображений
                     image_urls = []
-                    if len(row) > 3 and row[3]:  # Если есть URL изображений
-                        image_urls = [url.strip() for url in row[3].split(',') if url.strip()]
+                    if len(row) > 5 and row[5]:  # Если есть URL изображений в колонке F (6-я колонка)
+                        image_urls = [url.strip() for url in row[5].split(',') if url.strip()]
                     
                     post = {
                         'date': row[0] if len(row) > 0 else '',
                         'time': row[1] if len(row) > 1 else '',
                         'text': row[2] if len(row) > 2 else '',
+                        'prompt_ru': row[3] if len(row) > 3 else '',
+                        'prompt_en': row[4] if len(row) > 4 else '',
                         'image_urls': image_urls,
-                        'status': row[4] if len(row) > 4 else '',
-                        'prompt_ru': row[5] if len(row) > 5 else '',
-                        'prompt_en': row[6] if len(row) > 6 else '',
+                        'status': row[6] if len(row) > 6 else '',
                         'row_index': i  # Добавляем индекс строки для обновления статуса
                     }
                     pending_posts.append(post)
@@ -252,17 +252,17 @@ class GoogleSheetsClient:
                 if len(row) >= 5:  # Проверяем, что строка содержит основные колонки
                     # Парсим URL изображений
                     image_urls = []
-                    if len(row) > 3 and row[3]:  # Если есть URL изображений
-                        image_urls = [url.strip() for url in row[3].split(',') if url.strip()]
+                    if len(row) > 5 and row[5]:  # Если есть URL изображений в колонке F (6-я колонка)
+                        image_urls = [url.strip() for url in row[5].split(',') if url.strip()]
                     
                     post = {
                         'date': row[0] if len(row) > 0 else '',
                         'time': row[1] if len(row) > 1 else '',
                         'text': row[2] if len(row) > 2 else '',
+                        'prompt_ru': row[3] if len(row) > 3 else '',
+                        'prompt_en': row[4] if len(row) > 4 else '',
                         'image_urls': image_urls,
-                        'status': row[4] if len(row) > 4 else '',
-                        'prompt_ru': row[5] if len(row) > 5 else '',
-                        'prompt_en': row[6] if len(row) > 6 else '',
+                        'status': row[6] if len(row) > 6 else '',
                         'row_index': i  # Добавляем индекс строки для обновления статуса
                     }
                     posts.append(post)
@@ -287,10 +287,10 @@ class GoogleSheetsClient:
             # Получаем имя листа
             sheet_name = self.get_sheet_name()
             
-            # Обновляем статус в колонке E
+            # Обновляем статус в колонке G (7-я колонка)
             result = self.service.spreadsheets().values().update(
                 spreadsheetId=GOOGLE_SHEET_ID,
-                range=f'{sheet_name}!E{row_index}',
+                range=f'{sheet_name}!G{row_index}',
                 valueInputOption='RAW',
                 body={'values': [[status]]}
             ).execute()
@@ -341,8 +341,8 @@ class GoogleSheetsClient:
             # Получаем имя листа
             sheet_name = self.get_sheet_name()
             
-            # Устанавливаем заголовки
-            headers = [['Date', 'Time', 'Text', 'Image URLs', 'Status', 'Промпт RU', 'Промпт EN']]
+            # Устанавливаем заголовки (правильный порядок)
+            headers = [['Дата', 'Время', 'Пост', 'Промпт RU', 'Промпт EN', 'Изображение', 'Статус']]
             result = self.service.spreadsheets().values().update(
                 spreadsheetId=GOOGLE_SHEET_ID,
                 range=f'{sheet_name}!A1:G1',

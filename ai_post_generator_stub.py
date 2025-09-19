@@ -132,15 +132,15 @@ class AIPostGeneratorStub:
                 from datetime import datetime
                 scheduled_time = datetime.strptime(post["scheduled_time"], "%Y-%m-%d %H:%M")
                 
-                # Форматируем данные поста для Google Sheets
+                # Форматируем данные поста для Google Sheets (правильный порядок)
                 post_data = {
                     "date": scheduled_time.strftime("%Y-%m-%d"),
                     "time": scheduled_time.strftime("%H:%M"),
                     "text": post["text"],
-                    "image_urls": ", ".join(post["image_urls"]) if post["image_urls"] else "",
-                    "status": post["status"],
                     "prompt_ru": post.get("prompt_ru", ""),
-                    "prompt_en": post.get("prompt_en", "")
+                    "prompt_en": post.get("prompt_en", ""),
+                    "image_urls": ", ".join(post["image_urls"]) if post["image_urls"] else "",
+                    "status": post["status"]
                 }
                 
                 # Добавляем пост в таблицу
