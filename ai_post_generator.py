@@ -21,7 +21,7 @@ class AIPostGenerator:
     def __init__(self):
         import os
         self.openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
-        self.model = os.getenv("AI_MODEL", "anthropic/claude-3.5-sonnet")
+        self.model = os.getenv("AI_MODEL", "anthropic/claude-3.7-sonnet")
         self.api_url = "https://openrouter.ai/api/v1/chat/completions"
         self.sheets_client = GoogleSheetsClient()
         
@@ -274,11 +274,20 @@ class AIPostGenerator:
                 logger.error("❌ OpenRouter API ключ не настроен")
                 return None
             
+            # Дополнительная проверка - перезагружаем ключ из переменных окружения
+            import os
+            current_key = os.getenv("OPENROUTER_API_KEY")
+            if current_key != self.openrouter_api_key:
+                logger.warning("⚠️ API ключ изменился! Обновляем...")
+                self.openrouter_api_key = current_key
+            
             # Проверяем формат API ключа
             if not self.openrouter_api_key.startswith("sk-or-v1-"):
                 logger.warning(f"⚠️ API ключ может быть неверного формата. Ожидается 'sk-or-v1-...', получен: {self.openrouter_api_key[:10]}...")
             
             logger.info(f"🔑 Используем API ключ: {self.openrouter_api_key[:10]}...")
+            logger.info(f"🔑 Полная длина ключа: {len(self.openrouter_api_key)} символов")
+            logger.info(f"🔑 Ключ заканчивается на: ...{self.openrouter_api_key[-10:]}")
             
             headers = {
                 "Authorization": f"Bearer {self.openrouter_api_key}",
@@ -286,7 +295,7 @@ class AIPostGenerator:
             }
             
             # Список моделей для fallback
-            models_to_try = [self.model, "anthropic/claude-3.5-sonnet", "meta-llama/llama-3.1-8b-instruct"]
+            models_to_try = [self.model, "anthropic/claude-3.5-sonnet", "meta-llama/llama-3.1-8b-instruct", "openai/gpt-3.5-turbo"]
             
             for model in models_to_try:
                 data = {
