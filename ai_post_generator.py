@@ -189,6 +189,7 @@ class AIPostGenerator:
         
         posts = []
         start_date = datetime.now()
+        api_requests_count = 1  # Считаем тест API ключа
         
         for day in range(3):  # Только 3 дня
             current_date = start_date + timedelta(days=day)
@@ -196,11 +197,18 @@ class AIPostGenerator:
             
             # Генерируем 3 поста на день
             for post_type in ["утро", "день", "вечер"]:
+                logger.info(f"📝 Генерируем {post_type} пост для {date_str}")
                 post_data = await self._generate_single_post(date_str, post_type)
                 if post_data:
                     posts.append(post_data)
+                    # Считаем запросы: 1 для основного поста + 2 для промптов (только для дневных постов)
+                    if post_type == "день":
+                        api_requests_count += 3  # основной пост + 2 промпта
+                    else:
+                        api_requests_count += 1  # только основной пост
         
         logger.info(f"✅ Сгенерировано {len(posts)} постов на 3 дня")
+        logger.info(f"📊 Всего запросов к OpenRouter API: {api_requests_count}")
         return posts
 
     async def _generate_single_post(self, date: str, post_type: str) -> Dict[str, Any]:
@@ -288,9 +296,12 @@ class AIPostGenerator:
             else:  # Утренний и вечерний посты - Markdown (для постов без изображений)
                 cleaned_post = self._clean_markdown_post(post_text)
             
-            # Генерируем промпты для Midjourney
-            midjourney_prompt_ru = await self._generate_midjourney_prompt(post_text, "ru")
-            midjourney_prompt_en = await self._generate_midjourney_prompt(post_text, "en")
+            # Генерируем промпты для Midjourney только для дневных постов (с изображениями)
+            midjourney_prompt_ru = ""
+            midjourney_prompt_en = ""
+            if time == "14:00":  # Только для дневных постов
+                midjourney_prompt_ru = await self._generate_midjourney_prompt(post_text, "ru")
+                midjourney_prompt_en = await self._generate_midjourney_prompt(post_text, "en")
             
             # Добавляем изображение только для дневных постов (14:00)
             image_field = ""
@@ -302,8 +313,8 @@ class AIPostGenerator:
                 "date": date,
                 "time": time,
                 "post": cleaned_post,  # Используем очищенный пост
-                "midjourney_ru": midjourney_prompt_ru,
-                "midjourney_en": midjourney_prompt_en,
+                "prompt_ru": midjourney_prompt_ru,  # Переименовываем для соответствия Google Sheets
+                "prompt_en": midjourney_prompt_en,  # Переименовываем для соответствия Google Sheets
                 "image": image_field,  # Пустое поле для утренних и вечерних постов
                 "status": "Ожидает"
             }
@@ -355,6 +366,7 @@ class AIPostGenerator:
                 }
                 
                 logger.info(f"🤖 Пробуем модель: {model}")
+                logger.info(f"📡 Отправляем запрос к OpenRouter API...")
                 
                 async with aiohttp.ClientSession() as session:
                     async with session.post(self.api_url, headers=headers, json=data) as response:
