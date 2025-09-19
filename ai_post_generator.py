@@ -467,8 +467,8 @@ Prompt:"""
                 logger.info("Заголовки уже существуют")
                 return True
             
-            # Добавляем заголовки
-            result = self.sheets_client.add_post(headers)
+            # Добавляем заголовки через setup_headers
+            result = self.sheets_client.setup_headers()
             if result:
                 logger.info("✅ Заголовки таблицы инициализированы")
                 return True
@@ -486,17 +486,16 @@ Prompt:"""
             logger.info(f"📤 Загружаем {len(posts)} постов в Google Таблицу")
             
             for post in posts:
-                post_row = [
-                    post["date"],
-                    post["time"],
-                    post["post"],
-                    post["midjourney_ru"],
-                    post["midjourney_en"],
-                    post["image"],
-                    post["status"]
-                ]
+                # Преобразуем пост в правильный формат для add_post
+                post_data = {
+                    "date": post["date"],
+                    "time": post["time"],
+                    "text": post["post"],
+                    "image_urls": post["image"] if post["image"] else "",
+                    "status": post["status"]
+                }
                 
-                result = self.sheets_client.add_post(post_row)
+                result = self.sheets_client.add_post(post_data)
                 if not result:
                     logger.error(f"Ошибка загрузки поста {post['date']} {post['time']}")
                     return False
