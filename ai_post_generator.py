@@ -20,10 +20,17 @@ class AIPostGenerator:
     
     def __init__(self):
         import os
-        self.openrouter_api_key = os.getenv("OPENROUTER_API_KEY", "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")
+        self.openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
         self.model = os.getenv("AI_MODEL", "anthropic/claude-3.7-sonnet")
         self.api_url = "https://openrouter.ai/api/v1/chat/completions"
         self.sheets_client = GoogleSheetsClient()
+        
+        # Проверяем API ключ
+        if not self.openrouter_api_key or self.openrouter_api_key == "YOUR_OPENROUTER_API_KEY":
+            logger.error("❌ OPENROUTER_API_KEY не настроен! Установите переменную окружения OPENROUTER_API_KEY")
+            self.openrouter_api_key = None
+        else:
+            logger.info("✅ OpenRouter API ключ настроен")
         
         # Системный промпт для "Архитектора Отношений"
         self.system_prompt = """Системный Промпт для AI-Агента "Архитектор Отношений"
@@ -258,6 +265,11 @@ class AIPostGenerator:
     async def _call_openrouter_api(self, prompt: str) -> str:
         """Вызывает OpenRouter API для генерации текста"""
         try:
+            # Проверяем наличие API ключа
+            if not self.openrouter_api_key:
+                logger.error("❌ OpenRouter API ключ не настроен")
+                return None
+            
             headers = {
                 "Authorization": f"Bearer {self.openrouter_api_key}",
                 "Content-Type": "application/json"
@@ -273,17 +285,28 @@ class AIPostGenerator:
                 "temperature": 0.8
             }
             
+            logger.info(f"🤖 Отправляем запрос к OpenRouter API (модель: {self.model})")
+            
             async with aiohttp.ClientSession() as session:
                 async with session.post(self.api_url, headers=headers, json=data) as response:
                     if response.status == 200:
                         result = await response.json()
-                        return result["choices"][0]["message"]["content"].strip()
+                        content = result["choices"][0]["message"]["content"].strip()
+                        logger.info("✅ OpenRouter API ответил успешно")
+                        return content
+                    elif response.status == 401:
+                        logger.error("❌ Ошибка аутентификации OpenRouter API (401) - проверьте API ключ")
+                        return None
+                    elif response.status == 429:
+                        logger.error("❌ Превышен лимит запросов OpenRouter API (429)")
+                        return None
                     else:
-                        logger.error(f"Ошибка API: {response.status}")
+                        error_text = await response.text()
+                        logger.error(f"❌ Ошибка API: {response.status} - {error_text}")
                         return None
                         
         except Exception as e:
-            logger.error(f"Ошибка вызова OpenRouter API: {e}")
+            logger.error(f"❌ Ошибка вызова OpenRouter API: {e}")
             return None
 
     def _format_post_for_telegram(self, text: str) -> str:
