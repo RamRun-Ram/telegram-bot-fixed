@@ -138,7 +138,9 @@ class AIPostGeneratorStub:
                     "time": scheduled_time.strftime("%H:%M"),
                     "text": post["text"],
                     "image_urls": ", ".join(post["image_urls"]) if post["image_urls"] else "",
-                    "status": post["status"]
+                    "status": post["status"],
+                    "prompt_ru": post.get("prompt_ru", ""),
+                    "prompt_en": post.get("prompt_en", "")
                 }
                 
                 # Добавляем пост в таблицу

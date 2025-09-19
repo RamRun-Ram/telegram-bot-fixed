@@ -22,7 +22,7 @@ GOOGLE_SHEET_NAME = os.getenv("GOOGLE_SHEET_NAME", "Sheet1")
 
 # AI настройки
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "YOUR_OPENROUTER_API_KEY")
-AI_MODEL = os.getenv("AI_MODEL", "anthropic/claude-3.7-sonnet")
+AI_MODEL = os.getenv("AI_MODEL", "google/gemini-2.5-flash-lite-preview-06-17")
 
 # Настройки расписания проверок (время по МСК)
 # Проверяем каждый час с 8:01 до 22:01 (не проверяем с 23:00 до 7:00)
@@ -51,5 +51,7 @@ COLUMNS = {
     'TIME': 'Time', 
     'TEXT': 'Text',
     'IMAGE_URLS': 'Image URLs',
-    'STATUS': 'Status'
+    'STATUS': 'Status',
+    'PROMPT_RU': 'Промпт RU',
+    'PROMPT_EN': 'Промпт EN'
 }

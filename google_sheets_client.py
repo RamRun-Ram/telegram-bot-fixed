@@ -98,7 +98,9 @@ class GoogleSheetsClient:
                     post_data.get('time', ''),
                     post_data.get('text', ''),
                     post_data.get('image_urls', ''),
-                    STATUS_PUBLISHED
+                    STATUS_PUBLISHED,
+                    post_data.get('prompt_ru', ''),
+                    post_data.get('prompt_en', '')
                 ]
             ]
             
@@ -109,7 +111,7 @@ class GoogleSheetsClient:
             body = {'values': values}
             result = self.service.spreadsheets().values().append(
                 spreadsheetId=GOOGLE_SHEET_ID,
-                range=f'{sheet_name}!A:E',
+                range=f'{sheet_name}!A:G',
                 valueInputOption='RAW',
                 insertDataOption='INSERT_ROWS',
                 body=body
@@ -138,7 +140,7 @@ class GoogleSheetsClient:
             # Получаем данные из таблицы
             result = self.service.spreadsheets().values().get(
                 spreadsheetId=GOOGLE_SHEET_ID,
-                range=f'{sheet_name}!A:E'
+                range=f'{sheet_name}!A:G'
             ).execute()
             
             values = result.get('values', [])
@@ -149,13 +151,15 @@ class GoogleSheetsClient:
             # Пропускаем заголовок, берем последние записи
             posts = []
             for row in values[1:][-limit:]:  # Пропускаем заголовок, берем последние limit записей
-                if len(row) >= 5:  # Проверяем, что строка содержит все необходимые колонки
+                if len(row) >= 5:  # Проверяем, что строка содержит основные колонки
                     post = {
                         'date': row[0] if len(row) > 0 else '',
                         'time': row[1] if len(row) > 1 else '',
                         'text': row[2] if len(row) > 2 else '',
                         'image_urls': row[3] if len(row) > 3 else '',
-                        'status': row[4] if len(row) > 4 else ''
+                        'status': row[4] if len(row) > 4 else '',
+                        'prompt_ru': row[5] if len(row) > 5 else '',
+                        'prompt_en': row[6] if len(row) > 6 else ''
                     }
                     posts.append(post)
             
@@ -182,7 +186,7 @@ class GoogleSheetsClient:
             # Получаем данные из таблицы
             result = self.service.spreadsheets().values().get(
                 spreadsheetId=GOOGLE_SHEET_ID,
-                range=f'{sheet_name}!A:E'
+                range=f'{sheet_name}!A:G'
             ).execute()
             
             values = result.get('values', [])
@@ -205,6 +209,8 @@ class GoogleSheetsClient:
                         'text': row[2] if len(row) > 2 else '',
                         'image_urls': image_urls,
                         'status': row[4] if len(row) > 4 else '',
+                        'prompt_ru': row[5] if len(row) > 5 else '',
+                        'prompt_en': row[6] if len(row) > 6 else '',
                         'row_index': i  # Добавляем индекс строки для обновления статуса
                     }
                     pending_posts.append(post)
@@ -232,7 +238,7 @@ class GoogleSheetsClient:
             # Получаем данные из таблицы
             result = self.service.spreadsheets().values().get(
                 spreadsheetId=GOOGLE_SHEET_ID,
-                range=f'{sheet_name}!A:E'
+                range=f'{sheet_name}!A:G'
             ).execute()
             
             values = result.get('values', [])
@@ -243,7 +249,7 @@ class GoogleSheetsClient:
             # Обрабатываем все посты
             posts = []
             for i, row in enumerate(values[1:], start=2):  # Пропускаем заголовок
-                if len(row) >= 5:  # Проверяем, что строка содержит все необходимые колонки
+                if len(row) >= 5:  # Проверяем, что строка содержит основные колонки
                     # Парсим URL изображений
                     image_urls = []
                     if len(row) > 3 and row[3]:  # Если есть URL изображений
@@ -255,6 +261,8 @@ class GoogleSheetsClient:
                         'text': row[2] if len(row) > 2 else '',
                         'image_urls': image_urls,
                         'status': row[4] if len(row) > 4 else '',
+                        'prompt_ru': row[5] if len(row) > 5 else '',
+                        'prompt_en': row[6] if len(row) > 6 else '',
                         'row_index': i  # Добавляем индекс строки для обновления статуса
                     }
                     posts.append(post)
@@ -310,7 +318,7 @@ class GoogleSheetsClient:
             # Очищаем данные (оставляем заголовки)
             result = self.service.spreadsheets().values().clear(
                 spreadsheetId=GOOGLE_SHEET_ID,
-                range=f'{sheet_name}!A2:E'
+                range=f'{sheet_name}!A2:G'
             ).execute()
             
             logger.info("Таблица очищена (заголовки сохранены)")
@@ -334,10 +342,10 @@ class GoogleSheetsClient:
             sheet_name = self.get_sheet_name()
             
             # Устанавливаем заголовки
-            headers = [['Date', 'Time', 'Text', 'Image URLs', 'Status']]
+            headers = [['Date', 'Time', 'Text', 'Image URLs', 'Status', 'Промпт RU', 'Промпт EN']]
             result = self.service.spreadsheets().values().update(
                 spreadsheetId=GOOGLE_SHEET_ID,
-                range=f'{sheet_name}!A1:E1',
+                range=f'{sheet_name}!A1:G1',
                 valueInputOption='RAW',
                 body={'values': headers}
             ).execute()

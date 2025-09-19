@@ -588,7 +588,9 @@ Prompt:"""
                     "time": post["time"],
                     "text": post["post"],
                     "image_urls": post["image"] if post["image"] else "",
-                    "status": post["status"]
+                    "status": post["status"],
+                    "prompt_ru": post.get("prompt_ru", ""),
+                    "prompt_en": post.get("prompt_en", "")
                 }
                 
                 result = self.sheets_client.add_post(post_data)
