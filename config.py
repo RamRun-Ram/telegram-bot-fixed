@@ -6,7 +6,7 @@ from typing import Dict, Any
 
 # Telegram Bot настройки
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "YOUR_TELEGRAM_BOT_TOKEN")
-TELEGRAM_CHANNEL_ID = os.getenv("TELEGRAM_CHANNEL_ID", "-1003024242503")  # Основной канал для постов
+TELEGRAM_CHANNEL_ID = os.getenv("TELEGRAM_CHANNEL_ID", "-1002907282373")  # Основной канал для постов
 TELEGRAM_CHANNEL_USERNAME = os.getenv("TELEGRAM_CHANNEL_USERNAME", "@sovpalitest")
 ADMIN_CHAT_ID = os.getenv("ADMIN_CHAT_ID", "-1003089435390")  # Группа для уведомлений об ошибках
 ALERT_ADMIN_CHANNEL = os.getenv("ALERT_ADMIN_CHANNEL", "-1003089435390")  # Группа AlertChanel для команд

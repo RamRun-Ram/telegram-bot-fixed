@@ -173,7 +173,7 @@ def create_new_test_posts():
         if success_count > 0:
             print(f"\n🎯 НОВЫЕ ТЕСТОВЫЕ ПОСТЫ СОЗДАНЫ!")
             print(f"⏰ Посты должны быть опубликованы в течение 2 минут")
-            print(f"📱 Проверьте канал: t.me/sovpalitest")
+            print(f"📱 Проверьте канал: -1002907282373")
             return True
         else:
             print(f"\n❌ НЕ УДАЛОСЬ СОЗДАТЬ НОВЫЕ ТЕСТОВЫЕ ПОСТЫ")
@@ -202,7 +202,7 @@ def main():
     
     if create_ok:
         print(f"\n🎉 ПРОБЛЕМА РЕШЕНА!")
-        print(f"📱 Проверьте канал t.me/sovpalitest")
+        print(f"📱 Проверьте канал -1002907282373")
         print(f"⏰ Новые посты должны появиться в течение 2 минут")
     else:
         print(f"\n❌ ПРОБЛЕМА НЕ РЕШЕНА!")
