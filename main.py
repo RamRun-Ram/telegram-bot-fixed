@@ -169,10 +169,11 @@ class TelegramAutomation:
             logger.info("Клиенты успешно инициализированы")
             
             # Отправляем уведомление о запуске
+            current_time = datetime.now(self.moscow_tz)
             await self.notification_system.send_info_notification(
                 "🚀 Система автоматизации запущена",
                 {
-                    "время": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                    "время": current_time.strftime('%Y-%m-%d %H:%M:%S MSK'),
                     "проверка": f"каждые {CHECK_INTERVAL_MINUTES} минут",
                     "поиск": f"за последние {LOOKBACK_MINUTES} минут",
                     "канал": "@sovpalitest",
@@ -241,8 +242,9 @@ class TelegramAutomation:
             if not pending_posts:
                 logger.info("Нет постов для публикации")
                 # Отправляем уведомление о пустой проверке
-                current_time = datetime.now(self.moscow_tz).strftime('%H:%M:%S')
-                await self.notification_system.send_check_notification(0, 0, 0, current_time)
+                current_time = datetime.now(self.moscow_tz)
+                current_time_str = current_time.strftime('%H:%M:%S MSK')
+                await self.notification_system.send_check_notification(0, 0, 0, current_time_str)
                 return
             
             logger.info(f"Найдено {len(pending_posts)} постов со статусом 'Ожидает'")
@@ -263,7 +265,7 @@ class TelegramAutomation:
             if not posts_to_publish:
                 logger.info("Нет постов, готовых к публикации по времени")
                 # Отправляем уведомление о проверке без публикаций
-                current_time_str = current_time.strftime('%H:%M:%S')
+                current_time_str = current_time.strftime('%H:%M:%S MSK')
                 await self.notification_system.send_check_notification(len(pending_posts), 0, 0, current_time_str)
                 return
             
@@ -282,7 +284,7 @@ class TelegramAutomation:
                     errors_count += 1
             
             # Отправляем уведомление о результатах проверки
-            current_time_str = current_time.strftime('%H:%M:%S')
+            current_time_str = current_time.strftime('%H:%M:%S MSK')
             await self.notification_system.send_check_notification(
                 len(pending_posts), published_count, errors_count, current_time_str
             )

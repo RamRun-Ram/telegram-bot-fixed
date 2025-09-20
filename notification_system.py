@@ -65,7 +65,7 @@ class NotificationSystem:
                 status_text = "без публикаций"
             
             message = f"{status_emoji} <b>ПРОВЕРКА ЗАВЕРШЕНА</b>\n\n"
-            message += f"🕐 <b>Время:</b> {current_time}\n"
+            message += f"🕐 <b>Время:</b> {current_time} (Москва)\n"
             message += f"📊 <b>Статус:</b> {status_text}\n\n"
             message += f"📝 <b>Найдено постов:</b> {total_pending}\n"
             message += f"✅ <b>Опубликовано:</b> {published_count}\n"
