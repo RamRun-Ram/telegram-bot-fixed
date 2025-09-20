@@ -33,7 +33,7 @@ def test_time_logic():
     ]
     
     print(f"\n📊 LOOKBACK_MINUTES: {LOOKBACK_MINUTES}")
-    print(f"📝 Условие: -{LOOKBACK_MINUTES} <= time_diff <= 0")
+    print(f"📝 Условие: 0 <= time_diff <= {LOOKBACK_MINUTES}")
     print(f"\n🧪 ТЕСТОВЫЕ СЛУЧАИ:")
     
     for name, test_time in test_cases:
@@ -53,7 +53,7 @@ def test_time_logic():
             time_diff = (current_time - post_datetime).total_seconds() / 60
             
             # Проверяем условие
-            should_publish = -LOOKBACK_MINUTES <= time_diff <= 0
+            should_publish = 0 <= time_diff <= LOOKBACK_MINUTES
             
             status = "✅ ДА" if should_publish else "❌ НЕТ"
             print(f"  {name:12}: {status} (разница: {time_diff:6.1f} мин)")

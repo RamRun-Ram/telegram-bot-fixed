@@ -219,8 +219,9 @@ class TelegramAutomation:
             
             # Пост должен быть в прошлом или настоящем, но не более чем LOOKBACK_MINUTES назад
             # time_diff > 0 означает, что пост в прошлом
-            # time_diff <= 0 означает, что пост в будущем или сейчас
-            if -LOOKBACK_MINUTES <= time_diff <= 0:
+            # time_diff = 0 означает, что пост сейчас
+            # time_diff < 0 означает, что пост в будущем
+            if 0 <= time_diff <= LOOKBACK_MINUTES:
                 logger.info(f"Пост из строки {post['row_index']} подходит по времени (разница: {time_diff:.1f} мин)")
                 return True
             else:
