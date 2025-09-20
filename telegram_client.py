@@ -142,8 +142,8 @@ class TelegramClient:
         МЕТОД 2: Отправляет Markdown пост БЕЗ изображений (для утренних и вечерних постов)
         """
         try:
-            # Конвертируем Markdown в HTML для постов без изображений
-            formatted_text = self.format_text_for_telegram_html(text)
+            # Обрабатываем текст для Markdown постов
+            formatted_text = self.format_text_for_telegram_markdown(text)
             
             # Создаем новый экземпляр бота для этого запроса
             bot = AsyncTeleBot(self.bot_token)
@@ -151,10 +151,10 @@ class TelegramClient:
             await bot.send_message(
                 chat_id=self.channel_id,
                 text=formatted_text,
-                parse_mode='HTML'
+                parse_mode='Markdown'
             )
             
-            logger.info("Markdown пост без изображения отправлен через HTML конвертацию")
+            logger.info("Markdown пост без изображения отправлен")
             return True
             
         except Exception as e:
@@ -224,14 +224,15 @@ class TelegramClient:
     
     def _process_text_for_image_posts(self, text: str) -> str:
         """
-        Обрабатывает текст для постов с изображениями
+        Обрабатывает текст для постов с изображениями (HTML формат)
+        Оставляет HTML теги как есть для корректного отображения
         """
-        # Заменяем <br> на переносы строк
+        # Заменяем <br> на переносы строк для лучшего отображения
         text = text.replace('<br>', '\n')
         text = text.replace('<br/>', '\n')
         text = text.replace('<br />', '\n')
         
-        # Удаляем неподдерживаемые HTML теги
+        # Удаляем только неподдерживаемые HTML теги, оставляем <b>, <i>, <u>
         text = text.replace('<div>', '')
         text = text.replace('</div>', '')
         text = text.replace('<p>', '')
@@ -245,13 +246,31 @@ class TelegramClient:
         text = text.replace('<li>', '• ')
         text = text.replace('</li>', '\n')
         
-        # Обрабатываем теги <b> и </b> - заменяем на ** для Markdown
+        # НЕ конвертируем <b>, <i>, <u> - оставляем HTML для постов с изображениями
+        # Telegram поддерживает эти теги в HTML режиме
+        
+        return text
+    
+    def format_text_for_telegram_markdown(self, text: str) -> str:
+        """
+        Обрабатывает текст для Markdown постов (без изображений)
+        """
+        # Заменяем HTML теги на Markdown
         text = text.replace('<b>', '**')
         text = text.replace('</b>', '**')
         text = text.replace('<i>', '*')
         text = text.replace('</i>', '*')
         text = text.replace('<u>', '__')
         text = text.replace('</u>', '__')
+        text = text.replace('<br>', '\n')
+        text = text.replace('<br/>', '\n')
+        text = text.replace('<br />', '\n')
+        
+        # Удаляем HTML теги
+        text = text.replace('<div>', '')
+        text = text.replace('</div>', '')
+        text = text.replace('<p>', '')
+        text = text.replace('</p>', '')
         
         return text
     
