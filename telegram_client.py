@@ -37,6 +37,19 @@ class TelegramClient:
         
         return channel_id
     
+    def _convert_google_drive_url(self, url: str) -> str:
+        """
+        Преобразует ссылку Google Drive в прямую ссылку на изображение
+        """
+        if 'drive.google.com' in url and '/file/d/' in url:
+            # Извлекаем ID файла из ссылки Google Drive
+            file_id = url.split('/file/d/')[1].split('/')[0]
+            # Создаем прямую ссылку на изображение
+            direct_url = f"https://drive.google.com/uc?export=view&id={file_id}"
+            logger.info(f"Преобразована ссылка Google Drive: {url} -> {direct_url}")
+            return direct_url
+        return url
+    
     async def test_connection(self) -> bool:
         """Проверяет соединение с Telegram Bot API"""
         try:
@@ -81,7 +94,8 @@ class TelegramClient:
             
             # Обрабатываем текст для постов с изображениями
             processed_text = self._process_text_for_image_posts(text)
-            image_url = image_urls[0]
+            # Преобразуем ссылку Google Drive в прямую ссылку
+            image_url = self._convert_google_drive_url(image_urls[0])
             
             logger.info(f"Отправляем HTML пост с изображением: {image_url}")
             logger.info(f"Длина текста: {len(processed_text)} символов")
@@ -193,17 +207,20 @@ class TelegramClient:
             max_images = min(len(image_urls), 10)  # Telegram ограничивает до 10 изображений
             
             for i, image_url in enumerate(image_urls[:max_images]):
+                # Преобразуем ссылку Google Drive в прямую ссылку
+                converted_url = self._convert_google_drive_url(image_url)
+                
                 if i == 0:
                     # Первое изображение с подписью
                     media_group.append(InputMediaPhoto(
-                        media=image_url,
+                        media=converted_url,
                         caption=formatted_text,
                         parse_mode='Markdown'
                     ))
                 else:
                     # Остальные изображения без подписи
                     media_group.append(InputMediaPhoto(
-                        media=image_url
+                        media=converted_url
                     ))
             
             # Отправляем медиагруппу
@@ -232,7 +249,8 @@ class TelegramClient:
             processed_text = self._process_text_for_image_posts(text)
             
             # Используем HTML с невидимым символом (изображение внутри поста)
-            image_url = image_urls[0]
+            # Преобразуем ссылку Google Drive в прямую ссылку
+            image_url = self._convert_google_drive_url(image_urls[0])
             invisible_char = "&#8288;"  # Word Joiner
             
             # Формируем сообщение с невидимой ссылкой (изображение внутри поста)
