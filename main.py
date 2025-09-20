@@ -384,17 +384,14 @@ class TelegramAutomation:
                 current_time = datetime.now(self.moscow_tz)
                 current_hour = current_time.hour
                 
-                # Проверяем, нужно ли работать сейчас (8:00 - 22:00)
-                if 8 <= current_hour <= 22:
-                    logger.info(f"🕐 Рабочее время: {current_time.strftime('%H:%M')} - проверяем посты")
-                    
-                    # Запускаем обработку в отдельном потоке
-                    thread = threading.Thread(target=self._run_process_posts_thread)
-                    thread.daemon = True
-                    thread.start()
-                    thread.join()  # Ждем завершения
-                else:
-                    logger.info(f"😴 Время отдыха: {current_time.strftime('%H:%M')} - пропускаем проверку")
+                # Для тестирования работаем всегда (убираем ограничение по времени)
+                logger.info(f"🕐 Время: {current_time.strftime('%H:%M')} - проверяем посты")
+                
+                # Запускаем обработку в отдельном потоке
+                thread = threading.Thread(target=self._run_process_posts_thread)
+                thread.daemon = True
+                thread.start()
+                thread.join()  # Ждем завершения
                 
                 # Ждем CHECK_INTERVAL_MINUTES минут до следующей проверки
                 time.sleep(CHECK_INTERVAL_MINUTES * 60)
