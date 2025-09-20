@@ -445,32 +445,14 @@ class TelegramClient:
             # Обрабатываем текст для HTML цитат
             formatted_text = self._process_text_for_quotes(text)
             
-            # Создаем медиагруппу для цитаты с изображением
-            media_group = []
-            max_images = min(len(image_urls), 10)  # Telegram ограничивает до 10 изображений
-            
-            for i, image_url in enumerate(image_urls[:max_images]):
-                if i == 0:
-                    # Первое изображение с подписью (цитатой)
-                    media_group.append(InputMediaPhoto(
-                        media=image_url,
-                        caption=formatted_text,
-                        parse_mode='HTML'
-                    ))
-                else:
-                    # Остальные изображения без подписи
-                    media_group.append(InputMediaPhoto(
-                        media=image_url
-                    ))
-            
-            # Отправляем медиагруппу
-            await bot.send_media_group(
-                chat_id=self.channel_id,
-                media=media_group
-            )
-            
-            logger.info(f"Цитата с {max_images} изображениями отправлена как медиагруппа")
-            return True
+            # Для цитат с изображениями используем тот же подход, что и для обычных постов
+            # Это более надежно, чем медиагруппы с HTML
+            if len(image_urls) == 1:
+                # Одно изображение - используем HTML метод как для обычных постов
+                return await self.send_html_post_with_image(formatted_text, image_urls)
+            else:
+                # Несколько изображений - используем Markdown метод как для обычных постов
+                return await self.send_markdown_post_with_multiple_images(formatted_text, image_urls)
             
         except Exception as e:
             logger.error(f"Ошибка отправки цитаты с изображением: {e}")
