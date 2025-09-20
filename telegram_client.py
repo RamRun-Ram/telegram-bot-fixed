@@ -5,6 +5,7 @@ import logging
 from typing import List
 import asyncio
 from telebot.async_telebot import AsyncTeleBot
+from telebot.types import InputMediaPhoto
 from config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHANNEL_ID
 
 logger = logging.getLogger(__name__)
@@ -194,18 +195,16 @@ class TelegramClient:
             for i, image_url in enumerate(image_urls[:max_images]):
                 if i == 0:
                     # Первое изображение с подписью
-                    media_group.append({
-                        'type': 'photo',
-                        'media': image_url,
-                        'caption': formatted_text,
-                        'parse_mode': 'Markdown'
-                    })
+                    media_group.append(InputMediaPhoto(
+                        media=image_url,
+                        caption=formatted_text,
+                        parse_mode='Markdown'
+                    ))
                 else:
                     # Остальные изображения без подписи
-                    media_group.append({
-                        'type': 'photo',
-                        'media': image_url
-                    })
+                    media_group.append(InputMediaPhoto(
+                        media=image_url
+                    ))
             
             # Отправляем медиагруппу
             await bot.send_media_group(
