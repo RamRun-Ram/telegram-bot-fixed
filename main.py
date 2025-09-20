@@ -234,29 +234,40 @@ class TelegramAutomation:
             logger.info(f"📊 image_urls: {image_urls}")
             logger.info(f"📊 Количество URL: {len(image_urls) if image_urls else 0}")
             
-            # Определяем метод публикации по количеству изображений
-            if has_images:
-                image_count = len(post['image_urls'])
-                if image_count > 1:
-                    # Пост с НЕСКОЛЬКИМИ изображениями - Markdown метод с медиагруппой
-                    logger.info(f"🖼️ Пост с {image_count} изображениями - используем Markdown метод с медиагруппой")
-                    success = await self.telegram_client.send_markdown_post_with_multiple_images(
-                        text=post['text'],
-                        image_urls=post['image_urls']
-                    )
-                else:
-                    # Пост с ОДНИМ изображением - HTML метод
-                    logger.info("🖼️ Пост с 1 изображением - используем HTML метод")
-                    success = await self.telegram_client.send_html_post_with_image(
-                        text=post['text'],
-                        image_urls=post['image_urls']
-                    )
-            else:
-                # Пост БЕЗ изображений - Markdown метод
-                logger.info("📝 Пост без изображений - используем Markdown метод")
-                success = await self.telegram_client.send_markdown_post(
-                    text=post['text']
+            # Проверяем, является ли пост цитатой (начинается с ">")
+            is_quote = post['text'].strip().startswith('>')
+            
+            if is_quote:
+                # ЦИТАТА - используем специальный метод для цитат
+                logger.info("💬 Цитата - используем специальный метод для цитат")
+                success = await self.telegram_client.send_quote_post(
+                    text=post['text'],
+                    image_urls=post['image_urls']
                 )
+            else:
+                # ОБЫЧНЫЙ ПОСТ - определяем метод по количеству изображений
+                if has_images:
+                    image_count = len(post['image_urls'])
+                    if image_count > 1:
+                        # Пост с НЕСКОЛЬКИМИ изображениями - Markdown метод с медиагруппой
+                        logger.info(f"🖼️ Пост с {image_count} изображениями - используем Markdown метод с медиагруппой")
+                        success = await self.telegram_client.send_markdown_post_with_multiple_images(
+                            text=post['text'],
+                            image_urls=post['image_urls']
+                        )
+                    else:
+                        # Пост с ОДНИМ изображением - HTML метод
+                        logger.info("🖼️ Пост с 1 изображением - используем HTML метод")
+                        success = await self.telegram_client.send_html_post_with_image(
+                            text=post['text'],
+                            image_urls=post['image_urls']
+                        )
+                else:
+                    # Пост БЕЗ изображений - Markdown метод
+                    logger.info("📝 Пост без изображений - используем Markdown метод")
+                    success = await self.telegram_client.send_markdown_post(
+                        text=post['text']
+                    )
             
             if success:
                 # Обновляем статус на "Опубликовано"

@@ -391,3 +391,141 @@ class TelegramClient:
         text = re.sub(r'^> (.+?)$', r'<blockquote>\1</blockquote>', text, flags=re.MULTILINE)
         
         return text
+    
+    async def send_quote_post(self, text: str, image_urls: List[str] = None) -> bool:
+        """
+        СПЕЦИАЛЬНЫЙ МЕТОД: Отправляет цитату (пост, начинающийся с ">")
+        Цитаты могут быть с изображением или без
+        """
+        try:
+            # Проверяем, что это действительно цитата
+            if not text.strip().startswith('>'):
+                logger.error("Это не цитата - текст не начинается с '>'")
+                return False
+            
+            # Обрабатываем текст для цитат
+            processed_text = self._process_text_for_quotes(text)
+            
+            # Создаем новый экземпляр бота для этого запроса
+            bot = AsyncTeleBot(self.bot_token)
+            
+            if image_urls and len(image_urls) > 0 and any(url.strip() for url in image_urls if url.strip()):
+                # Цитата с изображением - используем медиагруппу
+                return await self._send_quote_with_image(bot, processed_text, image_urls)
+            else:
+                # Цитата без изображения - обычное сообщение
+                return await self._send_quote_without_image(bot, processed_text)
+                
+        except Exception as e:
+            logger.error(f"Ошибка отправки цитаты: {e}")
+            return False
+    
+    async def _send_quote_without_image(self, bot, text: str) -> bool:
+        """Отправляет цитату без изображения"""
+        try:
+            await bot.send_message(
+                chat_id=self.channel_id,
+                text=text,
+                parse_mode='HTML'
+            )
+            
+            logger.info("Цитата без изображения отправлена")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Ошибка отправки цитаты без изображения: {e}")
+            return False
+    
+    async def _send_quote_with_image(self, bot, text: str, image_urls: List[str]) -> bool:
+        """Отправляет цитату с изображением"""
+        try:
+            # Создаем медиагруппу для цитаты с изображением
+            media_group = []
+            max_images = min(len(image_urls), 10)  # Telegram ограничивает до 10 изображений
+            
+            for i, image_url in enumerate(image_urls[:max_images]):
+                if i == 0:
+                    # Первое изображение с подписью (цитатой)
+                    media_group.append(InputMediaPhoto(
+                        media=image_url,
+                        caption=text,
+                        parse_mode='HTML'
+                    ))
+                else:
+                    # Остальные изображения без подписи
+                    media_group.append(InputMediaPhoto(
+                        media=image_url
+                    ))
+            
+            # Отправляем медиагруппу
+            await bot.send_media_group(
+                chat_id=self.channel_id,
+                media=media_group
+            )
+            
+            logger.info(f"Цитата с {max_images} изображениями отправлена как медиагруппа")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Ошибка отправки цитаты с изображением: {e}")
+            return False
+    
+    def _process_text_for_quotes(self, text: str) -> str:
+        """
+        Обрабатывает текст для цитат
+        Создает правильное форматирование цитат в Telegram
+        """
+        # Убираем лишние пробелы и переносы
+        text = text.strip()
+        
+        # Обрабатываем цитаты - заменяем ">" на правильное форматирование
+        lines = text.split('\n')
+        processed_lines = []
+        
+        for line in lines:
+            line = line.strip()
+            if line.startswith('>'):
+                # Убираем ">" и добавляем правильное форматирование цитаты
+                quote_text = line[1:].strip()
+                if quote_text:
+                    # Создаем цитату с правильным форматированием
+                    processed_lines.append(f'<blockquote>{quote_text}</blockquote>')
+            else:
+                processed_lines.append(line)
+        
+        # Объединяем строки
+        result = '\n'.join(processed_lines)
+        
+        # Обрабатываем HTML теги для цитат
+        result = self._process_html_for_quotes(result)
+        
+        return result
+    
+    def _process_html_for_quotes(self, text: str) -> str:
+        """
+        Обрабатывает HTML теги для цитат
+        """
+        # Заменяем <br> на переносы строк
+        text = text.replace('<br>', '\n')
+        text = text.replace('<br/>', '\n')
+        text = text.replace('<br />', '\n')
+        
+        # Обрабатываем жирный текст
+        text = text.replace('<b>', '<b>')
+        text = text.replace('</b>', '</b>')
+        
+        # Обрабатываем курсив
+        text = text.replace('<i>', '<i>')
+        text = text.replace('</i>', '</i>')
+        
+        # Обрабатываем подчеркивание
+        text = text.replace('<u>', '<u>')
+        text = text.replace('</u>', '</u>')
+        
+        # Удаляем неподдерживаемые теги
+        text = text.replace('<div>', '')
+        text = text.replace('</div>', '')
+        text = text.replace('<p>', '')
+        text = text.replace('</p>', '')
+        
+        return text
