@@ -14,15 +14,43 @@ class TelegramClient:
     
     def __init__(self):
         self.bot_token = TELEGRAM_BOT_TOKEN
-        self.channel_id = TELEGRAM_CHANNEL_ID
+        self.channel_id = self._normalize_channel_id(TELEGRAM_CHANNEL_ID)
         self.bot = AsyncTeleBot(self.bot_token)
+        logger.info(f"TelegramClient инициализирован с channel_id: {self.channel_id}")
+    
+    def _normalize_channel_id(self, channel_id: str) -> str:
+        """Нормализует ID канала для Telegram API"""
+        if not channel_id:
+            return channel_id
+        
+        # Убираем @ если есть
+        if channel_id.startswith('@'):
+            return channel_id[1:]
+        
+        # Если это числовой ID, конвертируем в int
+        if channel_id.startswith('-100'):
+            try:
+                return int(channel_id)
+            except ValueError:
+                pass
+        
+        return channel_id
     
     async def test_connection(self) -> bool:
         """Проверяет соединение с Telegram Bot API"""
         try:
             bot_info = await self.bot.get_me()
             logger.info(f"Бот подключен: @{bot_info.username}")
-            return True
+            
+            # Проверяем доступ к каналу
+            try:
+                chat_info = await self.bot.get_chat(self.channel_id)
+                logger.info(f"Канал доступен: {chat_info.title} (ID: {chat_info.id})")
+                return True
+            except Exception as e:
+                logger.error(f"Ошибка доступа к каналу {self.channel_id}: {e}")
+                return False
+                
         except Exception as e:
             logger.error(f"Ошибка подключения к Telegram: {e}")
             return False
@@ -216,6 +244,14 @@ class TelegramClient:
         text = text.replace('</ol>', '')
         text = text.replace('<li>', '• ')
         text = text.replace('</li>', '\n')
+        
+        # Обрабатываем теги <b> и </b> - заменяем на ** для Markdown
+        text = text.replace('<b>', '**')
+        text = text.replace('</b>', '**')
+        text = text.replace('<i>', '*')
+        text = text.replace('</i>', '*')
+        text = text.replace('<u>', '__')
+        text = text.replace('</u>', '__')
         
         return text
     
