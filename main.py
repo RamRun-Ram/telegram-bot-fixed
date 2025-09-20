@@ -138,18 +138,18 @@ class TelegramAutomation:
                             logger.warning(f"Не удалось распарсить дату/время поста: {post_date_str} {post_time_str}")
                             return False
             
-            # Проверяем, подходит ли время (в пределах LOOKBACK_MINUTES)
+            # Проверяем, подходит ли время (пост должен быть до текущего времени)
             time_diff = (current_time - post_datetime).total_seconds() / 60  # в минутах
             
-            # Пост должен быть в прошлом или настоящем, но не более чем LOOKBACK_MINUTES назад
+            # Пост должен быть в прошлом или настоящем (time_diff >= 0)
             # time_diff > 0 означает, что пост в прошлом
             # time_diff = 0 означает, что пост сейчас
             # time_diff < 0 означает, что пост в будущем
-            if 0 <= time_diff <= LOOKBACK_MINUTES:
-                logger.info(f"Пост из строки {post['row_index']} подходит по времени (разница: {time_diff:.1f} мин)")
+            if time_diff >= 0:
+                logger.info(f"Пост из строки {post['row_index']} подходит по времени (время поста: {post_datetime.strftime('%H:%M')}, текущее: {current_time.strftime('%H:%M')}, разница: {time_diff:.1f} мин)")
                 return True
             else:
-                logger.debug(f"Пост из строки {post['row_index']} не подходит по времени (разница: {time_diff:.1f} мин)")
+                logger.debug(f"Пост из строки {post['row_index']} не подходит по времени (время поста: {post_datetime.strftime('%H:%M')}, текущее: {current_time.strftime('%H:%M')}, разница: {time_diff:.1f} мин) - пост в будущем")
                 return False
                 
         except Exception as e:
