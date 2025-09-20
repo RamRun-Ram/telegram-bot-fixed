@@ -224,11 +224,15 @@ class TelegramAutomation:
         """Публикует один пост. Возвращает True если успешно, False если ошибка"""
         row_index = post['row_index']
         post_time = post['time']
-        has_images = post.get('image_urls') and len(post['image_urls']) > 0
+        # Более строгая проверка наличия изображений
+        image_urls = post.get('image_urls', [])
+        has_images = bool(image_urls and len(image_urls) > 0 and any(url.strip() for url in image_urls if url.strip()))
         
         try:
             logger.info(f"Публикуем пост из строки {row_index} (время: {post_time})")
             logger.info(f"🖼️ Изображения: {'да' if has_images else 'нет'}")
+            logger.info(f"📊 image_urls: {image_urls}")
+            logger.info(f"📊 Количество URL: {len(image_urls) if image_urls else 0}")
             
             # Определяем метод публикации по количеству изображений
             if has_images:
