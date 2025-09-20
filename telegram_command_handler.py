@@ -8,7 +8,6 @@ from datetime import datetime
 from typing import Optional
 import telebot
 from ai_post_generator import AIPostGenerator
-from ai_post_generator_stub import AIPostGeneratorStub
 from google_sheets_client import GoogleSheetsClient
 from config import TELEGRAM_BOT_TOKEN, NOTIFICATION_CHANNEL_ID, COMMAND_CHANNEL_ID
 
@@ -36,15 +35,20 @@ class TelegramCommandHandler:
             try:
                 # Пробуем создать реальный AI генератор
                 self.ai_generator = AIPostGenerator()
+                
+                # Проверяем Google Sheets
+                if not self.sheets_client.service:
+                    logger.warning("⚠️ Google Sheets не настроен - посты не будут загружены в таблицу")
+                
                 # Тестируем API ключ
                 if hasattr(self.ai_generator, '_test_api_key_sync'):
                     if not self.ai_generator._test_api_key_sync():
-                        logger.warning("⚠️ API ключ не работает, переключаемся на заглушку")
-                        self.ai_generator = AIPostGeneratorStub()
+                        logger.warning("⚠️ API ключ не работает, используем основной генератор")
+                        # Оставляем основной генератор, но с предупреждением
             except Exception as e:
                 logger.error(f"❌ Ошибка инициализации AI генератора: {e}")
-                logger.info("🔄 Переключаемся на заглушку")
-                self.ai_generator = AIPostGeneratorStub()
+                logger.info("🔄 Используем основной генератор")
+                self.ai_generator = AIPostGenerator()
         return self.ai_generator
     
     def setup_handlers(self):
@@ -143,6 +147,9 @@ class TelegramCommandHandler:
                     success = asyncio.run(self.get_ai_generator().generate_and_upload_weekly_posts())
                     
                     if success:
+                        # Проверяем статус Google Sheets
+                        sheets_status = "✅ Google Sheets настроен - посты загружены в таблицу" if self.sheets_client.service else "⚠️ Google Sheets не настроен - посты не загружены в таблицу"
+                        
                         # Обновляем статус
                         self.bot.edit_message_text(
                             "✅ Посты успешно сгенерированы!\n\n"
@@ -150,8 +157,7 @@ class TelegramCommandHandler:
                             "• 3 утренних поста (08:00)\n"
                             "• 3 обеденных поста (14:00) с изображениями\n"
                             "• 3 вечерних поста (20:00)\n\n"
-                            "⚠️ Google Sheets не настроен - посты не загружены в таблицу\n"
-                            "📋 Настройте Google Sheets API для полной функциональности\n\n"
+                            f"{sheets_status}\n"
                             "🚀 Посты будут автоматически опубликованы по расписанию!",
                             chat_id=message.chat.id,
                             message_id=status_msg.message_id
