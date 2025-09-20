@@ -423,10 +423,13 @@ class TelegramClient:
     async def _send_quote_without_image(self, bot, text: str) -> bool:
         """Отправляет цитату без изображения"""
         try:
+            # Обрабатываем текст для Markdown цитат
+            formatted_text = self.format_text_for_telegram_markdown(text)
+            
             await bot.send_message(
                 chat_id=self.channel_id,
-                text=text,
-                parse_mode='HTML'
+                text=formatted_text,
+                parse_mode='Markdown'
             )
             
             logger.info("Цитата без изображения отправлена")
@@ -439,6 +442,9 @@ class TelegramClient:
     async def _send_quote_with_image(self, bot, text: str, image_urls: List[str]) -> bool:
         """Отправляет цитату с изображением"""
         try:
+            # Обрабатываем текст для Markdown цитат
+            formatted_text = self.format_text_for_telegram_markdown(text)
+            
             # Создаем медиагруппу для цитаты с изображением
             media_group = []
             max_images = min(len(image_urls), 10)  # Telegram ограничивает до 10 изображений
@@ -448,8 +454,8 @@ class TelegramClient:
                     # Первое изображение с подписью (цитатой)
                     media_group.append(InputMediaPhoto(
                         media=image_url,
-                        caption=text,
-                        parse_mode='HTML'
+                        caption=formatted_text,
+                        parse_mode='Markdown'
                     ))
                 else:
                     # Остальные изображения без подписи
@@ -473,63 +479,29 @@ class TelegramClient:
     def _process_text_for_quotes(self, text: str) -> str:
         """
         Обрабатывает текст для цитат
-        Создает правильное форматирование цитат в Telegram
+        Создает правильное форматирование цитат в Telegram (Markdown)
         """
         # Убираем лишние пробелы и переносы
         text = text.strip()
         
-        # Обрабатываем цитаты - заменяем ">" на правильное форматирование
+        # Обрабатываем цитаты - заменяем ">" на Markdown форматирование
         lines = text.split('\n')
         processed_lines = []
         
         for line in lines:
             line = line.strip()
             if line.startswith('>'):
-                # Убираем ">" и добавляем правильное форматирование цитаты
+                # Убираем ">" и добавляем Markdown форматирование цитаты
                 quote_text = line[1:].strip()
                 if quote_text:
-                    # Создаем цитату с визуальным оформлением
-                    # Используем символы для создания эффекта цитаты
-                    processed_lines.append(f'┌─ 💬\n│ {quote_text}\n└─')
+                    # Создаем цитату с Markdown форматированием
+                    # Используем > для создания цитаты в Markdown
+                    processed_lines.append(f'> {quote_text}')
             else:
                 processed_lines.append(line)
         
         # Объединяем строки
         result = '\n'.join(processed_lines)
         
-        # Обрабатываем HTML теги для цитат
-        result = self._process_html_for_quotes(result)
-        
         return result
     
-    def _process_html_for_quotes(self, text: str) -> str:
-        """
-        Обрабатывает HTML теги для цитат
-        """
-        # Заменяем <br> на переносы строк
-        text = text.replace('<br>', '\n')
-        text = text.replace('<br/>', '\n')
-        text = text.replace('<br />', '\n')
-        
-        # Обрабатываем жирный текст
-        text = text.replace('<b>', '<b>')
-        text = text.replace('</b>', '</b>')
-        
-        # Обрабатываем курсив
-        text = text.replace('<i>', '<i>')
-        text = text.replace('</i>', '</i>')
-        
-        # Обрабатываем подчеркивание
-        text = text.replace('<u>', '<u>')
-        text = text.replace('</u>', '</u>')
-        
-        # Удаляем неподдерживаемые теги
-        text = text.replace('<div>', '')
-        text = text.replace('</div>', '')
-        text = text.replace('<p>', '')
-        text = text.replace('</p>', '')
-        
-        # Убираем лишние переносы строк
-        text = text.replace('\n\n\n', '\n\n')
-        
-        return text
