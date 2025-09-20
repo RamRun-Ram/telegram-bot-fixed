@@ -277,7 +277,7 @@ class GoogleSheetsClient:
             logger.error(f"Ошибка получения всех постов: {e}")
             return []
     
-    def update_post_status(self, row_index: int, status: str) -> bool:
+    def update_post_status(self, row_index: int, status: str, error_msg: str = None) -> bool:
         """Обновляет статус поста в Google Sheets"""
         if not self.service:
             logger.warning("Google Sheets API не инициализирован, пропускаем обновление")
@@ -295,7 +295,10 @@ class GoogleSheetsClient:
                 body={'values': [[status]]}
             ).execute()
             
-            logger.info(f"Статус поста в строке {row_index} обновлен на '{status}'")
+            if error_msg:
+                logger.info(f"Статус поста в строке {row_index} обновлен на '{status}': {error_msg}")
+            else:
+                logger.info(f"Статус поста в строке {row_index} обновлен на '{status}'")
             return True
             
         except HttpError as e:
