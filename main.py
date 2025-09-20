@@ -216,8 +216,10 @@ class TelegramAutomation:
             # Проверяем, подходит ли время (в пределах LOOKBACK_MINUTES)
             time_diff = (current_time - post_datetime).total_seconds() / 60  # в минутах
             
-            # Пост должен быть в пределах LOOKBACK_MINUTES от текущего времени
-            if 0 <= time_diff <= LOOKBACK_MINUTES:
+            # Пост должен быть в прошлом или настоящем, но не более чем LOOKBACK_MINUTES назад
+            # time_diff > 0 означает, что пост в прошлом
+            # time_diff <= 0 означает, что пост в будущем или сейчас
+            if -LOOKBACK_MINUTES <= time_diff <= 0:
                 logger.info(f"Пост из строки {post['row_index']} подходит по времени (разница: {time_diff:.1f} мин)")
                 return True
             else:
@@ -247,13 +249,16 @@ class TelegramAutomation:
             
             # Фильтруем посты по времени
             current_time = datetime.now(self.moscow_tz)
+            logger.info(f"🕐 Текущее время (Москва): {current_time.strftime('%Y-%m-%d %H:%M:%S')}")
             posts_to_publish = []
             
             for post in pending_posts:
+                logger.info(f"🔍 Проверяем пост из строки {post['row_index']}: {post['date']} {post['time']}")
                 if self._should_publish_post(post, current_time):
                     posts_to_publish.append(post)
+                    logger.info(f"✅ Пост из строки {post['row_index']} добавлен в очередь публикации")
                 else:
-                    logger.info(f"Пост из строки {post['row_index']} не подходит по времени (время: {post['time']}, дата: {post['date']})")
+                    logger.info(f"⏰ Пост из строки {post['row_index']} не подходит по времени (время: {post['time']}, дата: {post['date']})")
             
             if not posts_to_publish:
                 logger.info("Нет постов, готовых к публикации по времени")
