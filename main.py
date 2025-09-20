@@ -311,14 +311,23 @@ class TelegramAutomation:
             logger.info(f"Публикуем пост из строки {row_index} (время: {post_time})")
             logger.info(f"🖼️ Изображения: {'да' if has_images else 'нет'}")
             
-            # Определяем метод публикации по наличию изображений
+            # Определяем метод публикации по количеству изображений
             if has_images:
-                # Пост С изображениями - HTML метод
-                logger.info("🖼️ Пост с изображениями - используем HTML метод")
-                success = await self.telegram_client.send_html_post_with_image(
-                    text=post['text'],
-                    image_urls=post['image_urls']
-                )
+                image_count = len(post['image_urls'])
+                if image_count > 1:
+                    # Пост с НЕСКОЛЬКИМИ изображениями - Markdown метод с медиагруппой
+                    logger.info(f"🖼️ Пост с {image_count} изображениями - используем Markdown метод с медиагруппой")
+                    success = await self.telegram_client.send_markdown_post_with_multiple_images(
+                        text=post['text'],
+                        image_urls=post['image_urls']
+                    )
+                else:
+                    # Пост с ОДНИМ изображением - HTML метод
+                    logger.info("🖼️ Пост с 1 изображением - используем HTML метод")
+                    success = await self.telegram_client.send_html_post_with_image(
+                        text=post['text'],
+                        image_urls=post['image_urls']
+                    )
             else:
                 # Пост БЕЗ изображений - Markdown метод
                 logger.info("📝 Пост без изображений - используем Markdown метод")

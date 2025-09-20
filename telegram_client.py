@@ -163,6 +163,63 @@ class TelegramClient:
             logger.error(f"Ошибка отправки Markdown поста: {e}")
             return False
     
+    async def send_markdown_post_with_multiple_images(self, text: str, image_urls: List[str]) -> bool:
+        """
+        МЕТОД 3: Отправляет Markdown пост С несколькими изображениями
+        Ограничение: до 1000 символов текста + медиагруппа с изображениями
+        """
+        try:
+            if not image_urls or len(image_urls) == 0:
+                logger.error("Нет изображений для поста с несколькими изображениями")
+                return False
+            
+            # Ограничиваем длину текста до 1000 символов
+            if len(text) > 1000:
+                text = text[:1000] + "..."
+                logger.warning(f"Текст обрезан до 1000 символов (было {len(text)} символов)")
+            
+            # Обрабатываем текст для Markdown постов
+            formatted_text = self.format_text_for_telegram_markdown(text)
+            
+            logger.info(f"Отправляем Markdown пост с {len(image_urls)} изображениями")
+            logger.info(f"Длина текста: {len(formatted_text)} символов")
+            
+            # Создаем новый экземпляр бота для этого запроса
+            bot = AsyncTeleBot(self.bot_token)
+            
+            # Создаем медиагруппу (до 10 изображений)
+            media_group = []
+            max_images = min(len(image_urls), 10)  # Telegram ограничивает до 10 изображений
+            
+            for i, image_url in enumerate(image_urls[:max_images]):
+                if i == 0:
+                    # Первое изображение с подписью
+                    media_group.append({
+                        'type': 'photo',
+                        'media': image_url,
+                        'caption': formatted_text,
+                        'parse_mode': 'Markdown'
+                    })
+                else:
+                    # Остальные изображения без подписи
+                    media_group.append({
+                        'type': 'photo',
+                        'media': image_url
+                    })
+            
+            # Отправляем медиагруппу
+            await bot.send_media_group(
+                chat_id=self.channel_id,
+                media=media_group
+            )
+            
+            logger.info(f"Markdown пост с {max_images} изображениями отправлен как медиагруппа")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Ошибка отправки Markdown поста с несколькими изображениями: {e}")
+            return False
+    
     async def send_image_post(self, text: str, image_urls: List[str]) -> bool:
         """
         МЕТОД 1: Отправляет пост С изображениями
