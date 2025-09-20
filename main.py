@@ -208,11 +208,16 @@ class TelegramAutomation:
                     post_datetime = self.moscow_tz.localize(post_datetime)
                 except ValueError:
                     try:
-                        post_datetime = datetime.strptime(f"{post_date_str} {post_time_str}", "%Y-%m-%d %H:%M:%S")
+                        # Пробуем формат с коротким годом (20.09.25)
+                        post_datetime = datetime.strptime(f"{post_date_str} {post_time_str}", "%d.%m.%y %H:%M")
                         post_datetime = self.moscow_tz.localize(post_datetime)
                     except ValueError:
-                        logger.warning(f"Не удалось распарсить дату/время поста: {post_date_str} {post_time_str}")
-                        return False
+                        try:
+                            post_datetime = datetime.strptime(f"{post_date_str} {post_time_str}", "%Y-%m-%d %H:%M:%S")
+                            post_datetime = self.moscow_tz.localize(post_datetime)
+                        except ValueError:
+                            logger.warning(f"Не удалось распарсить дату/время поста: {post_date_str} {post_time_str}")
+                            return False
             
             # Проверяем, подходит ли время (в пределах LOOKBACK_MINUTES)
             time_diff = (current_time - post_datetime).total_seconds() / 60  # в минутах
