@@ -488,8 +488,9 @@ class TelegramClient:
                 # Убираем ">" и добавляем правильное форматирование цитаты
                 quote_text = line[1:].strip()
                 if quote_text:
-                    # Создаем цитату с правильным форматированием
-                    processed_lines.append(f'<blockquote>{quote_text}</blockquote>')
+                    # Создаем цитату с визуальным оформлением
+                    # Используем символы для создания эффекта цитаты
+                    processed_lines.append(f'┌─ 💬\n│ {quote_text}\n└─')
             else:
                 processed_lines.append(line)
         
@@ -527,5 +528,8 @@ class TelegramClient:
         text = text.replace('</div>', '')
         text = text.replace('<p>', '')
         text = text.replace('</p>', '')
+        
+        # Убираем лишние переносы строк
+        text = text.replace('\n\n\n', '\n\n')
         
         return text
